@@ -2,6 +2,8 @@
 Idea: do a hypergraph and then subclasses
 '''
 
+import pandas as pd
+
 class Hypergraph:
     def __init__(self):
             '''Initializing the hypergraph'''
@@ -66,9 +68,11 @@ class Hypergraph:
 
 
 class UndirectedHypergraph(Hypergraph):
-    def add_hyperedge(self, hyperedge_id:str, nodes:list):
+    def add_hyperedge(self, hyperedge_id:str, nodes:list, verbose=True):
         """Add a hyperedge to the hypergraph. Automatically adds missing nodes."""
         # Ensure nodes is a list
+        # print(nodes)
+        # quit()
         if not isinstance(nodes, list):
             raise ValueError("Nodes must be provided as a list")
         
@@ -82,8 +86,26 @@ class UndirectedHypergraph(Hypergraph):
                 self.add_node(node)
 
         # Add the hyperedge
+        if verbose:
+            f'Adding hyperedge {hyperedge_id} with nodes {nodes}'
         self.hyperedges[hyperedge_id] = nodes
         self.weights[hyperedge_id] = [1] #init the weights to 1
+        return
+    
+    def build_from_dataframe(self, df:pd.DataFrame, verbose=True):
+        '''Build hypergraph from a DataFrame'''
+        print(self.nodes)
+        print(self.hyperedges)
+        # quit()
+        # make an edge from each row in the csv
+        #TODO: make this more general?
+        for _, row in df.iterrows():
+            node1 = row[0] #start
+            node2 = row[1] #end
+            edgeid = node1 + '_to_' + node2
+            # print(node1, node2, edgeid)
+            # quit()
+            self.add_hyperedge(edgeid, [node1, node2], verbose)
         return
   
 class DirectedHypergraph(Hypergraph):
@@ -91,17 +113,28 @@ class DirectedHypergraph(Hypergraph):
         '''Function to add a hyperedge to the hypergraph'''
         self.hyperedges[hyperedge_id] = (tail_set, head_set)
         self.weights[hyperedge_id]=[1] # init the weight to 1
+    
   
 if __name__ == "__main__": 
-    
-    directed_flag = True 
+    directed_flag = False 
     verbose = True
     
+    data = pd.read_csv('inputfiles/london_system.csv', header=None, sep='\t')
+    
+    #TODO: make a quick little test to make sure its a simple graph
+    
     if directed_flag:
+        graph = DirectedHypergraph()
         if verbose:
             print('directed')
     else:
+        graph = UndirectedHypergraph()
+        graph.build_from_dataframe(data, verbose)
         if verbose:
             print('undirected')
+            print("Number of edges:",len(graph.hyperedges)) #Printing the number of hyperedges or papers in our network.
+            print("Number of nodes",len(graph.nodes)) #Printing the number of nodes or authors in the network.
+            print('The actual nodes:', graph.nodes)
+
             
-    print('hey')
+    # print('hey')
