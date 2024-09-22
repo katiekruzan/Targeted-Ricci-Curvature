@@ -42,6 +42,8 @@ class Hypergraph:
             edges = self.get_underlying_edges()
         else: edges = self.hyperedges
         
+        print(edges)
+        
         visited = set()
 
         def dfs(node):
@@ -58,6 +60,8 @@ class Hypergraph:
         # Start DFS from any node
         start_node = next(iter(self.nodes))
         dfs(start_node)
+        
+        print(visited)
 
         return visited == self.nodes   
   
@@ -158,6 +162,11 @@ class DirectedHypergraph(Hypergraph):
                     edges.add(edge)
         return edges
     
+def save_matrix_csv(matrix, filename:str) -> None:
+    '''Function to save the matrix as a CSV file'''    
+    pd.DataFrame(matrix).to_csv(filename, index=False, header=False)
+
+    
   
 if __name__ == "__main__": 
     directed_flag = False 
@@ -185,9 +194,21 @@ if __name__ == "__main__":
             print("Number of edges:",len(graph.hyperedges)) #Printing the number of hyperedges or papers in our network.
             print("Number of nodes",len(graph.nodes)) #Printing the number of nodes or authors in the network.
             # print('The actual nodes:', graph.nodes)
+            
+            # TODO: fix is weakly connected.
             connected = graph.is_weakly_connected()
             print("The hypergraph is weakly connected:" if connected else "The hypergraph is not weakly connected.")
 
+    distance_matrix = graph.floyd_warshall()
+    save_matrix_csv(distance_matrix, 'outputfiles/undirected_testing_fw.csv')
 
+    print('starting ricci curvature')
+
+    #TODO: Same idea as in the directed Hypergraph script
+    #TODO: check to see if the guys are the same
+    # update_orc_and_weights_iter0(distance_matrix,iteration=0)
+    
+    print('Itteration 0 done')
+ 
             
     # print('hey')
