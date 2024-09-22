@@ -59,7 +59,8 @@ class Hypergraph:
         start_node = next(iter(self.nodes))
         dfs(start_node)
 
-        return visited == self.nodes        
+        return visited == self.nodes   
+  
     
     def floyd_warshall(self):
         # TODO: double check this works for both and with weights
@@ -130,8 +131,8 @@ class UndirectedHypergraph(Hypergraph):
         # make an edge from each row in the csv
         #TODO: make this more general?
         for _, row in df.iterrows():
-            node1 = row[0] #start
-            node2 = row[1] #end
+            node1 = row[0].strip() #start
+            node2 = row[1].strip() #end
             edgeid = node1 + '_to_' + node2
             # print(node1, node2, edgeid)
             # quit()
@@ -162,7 +163,13 @@ if __name__ == "__main__":
     directed_flag = False 
     verbose = True
     
-    data = pd.read_csv('inputfiles/london_system.csv', header=None, sep='\t')
+    # TODO: make a simple graph data set. We need 2 graphs 
+    data1 = pd.read_csv('inputfiles/petersengraph.csv', header=None, sep=',')
+    data2 = pd.read_csv('inputfiles/petersengraphExtraEdge.csv', header=None, sep=',')
+    # print(data1.info())
+    # print(data1.head())
+    
+    # quit()
     
     #TODO: make a quick little test to make sure its a simple graph
     
@@ -172,7 +179,7 @@ if __name__ == "__main__":
             print('directed')
     else:
         graph = UndirectedHypergraph()
-        graph.build_from_dataframe(data, verbose)
+        graph.build_from_dataframe(data1, verbose)
         if verbose:
             print('undirected')
             print("Number of edges:",len(graph.hyperedges)) #Printing the number of hyperedges or papers in our network.
