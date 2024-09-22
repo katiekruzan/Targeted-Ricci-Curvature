@@ -31,6 +31,36 @@ class Hypergraph:
         if weights is not None:
             self.weights[hyperedge_id].append(weights)
             
+    def is_weakly_connected(self)-> bool:
+        '''Check if the underlying graph is weakly connected
+        '''
+        # I think this is saying an empty graph is weakly connected
+        if not self.nodes: 
+            return True
+
+        if isinstance(self, DirectedHypergraph):
+            edges = self.get_underlying_edges()
+        else: edges = self.hyperedges
+        
+        visited = set()
+
+        def dfs(node):
+            '''Depth First Search'''
+            if node in visited:
+                return
+            visited.add(node)
+            for edge in edges:
+                if node in edge:
+                    for next_node in edge:
+                        if next_node != node:
+                            dfs(next_node)
+
+        # Start DFS from any node
+        start_node = next(iter(self.nodes))
+        dfs(start_node)
+
+        return visited == self.nodes        
+    
     def floyd_warshall(self):
         # TODO: double check this works for both and with weights
         node_list = list(self.nodes)
@@ -113,6 +143,19 @@ class DirectedHypergraph(Hypergraph):
         '''Function to add a hyperedge to the hypergraph'''
         self.hyperedges[hyperedge_id] = (tail_set, head_set)
         self.weights[hyperedge_id]=[1] # init the weight to 1
+        
+    def get_underlying_edges(self) -> set:
+        '''Function to get the edges from the hyperedges.
+            Extract all edges from the hyperedges. 
+            These are all possible connections (aka turn hypergraph into simple graph)
+        '''
+        edges = set()
+        for tail_set, head_set in self.hyperedges.values():
+            for tail in tail_set:
+                for head in head_set:
+                    edge = frozenset([tail, head])
+                    edges.add(edge)
+        return edges
     
   
 if __name__ == "__main__": 
@@ -134,7 +177,10 @@ if __name__ == "__main__":
             print('undirected')
             print("Number of edges:",len(graph.hyperedges)) #Printing the number of hyperedges or papers in our network.
             print("Number of nodes",len(graph.nodes)) #Printing the number of nodes or authors in the network.
-            print('The actual nodes:', graph.nodes)
+            # print('The actual nodes:', graph.nodes)
+            connected = graph.is_weakly_connected()
+            print("The hypergraph is weakly connected:" if connected else "The hypergraph is not weakly connected.")
+
 
             
     # print('hey')
