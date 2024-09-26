@@ -3,6 +3,7 @@ Idea: do a hypergraph and then subclasses
 '''
 
 import pandas as pd
+import csv
 
 class Hypergraph:
     def __init__(self):
@@ -39,6 +40,7 @@ class Hypergraph:
             return True
 
         if isinstance(self, DirectedHypergraph):
+            # TODO: Get is_weakly_connected to work for Directed
             edges = self.get_underlying_edges()
         else: edges = self.hyperedges
         
@@ -51,7 +53,7 @@ class Hypergraph:
             if node in visited:
                 return
             visited.add(node)
-            for edge in edges:
+            for edge in edges.values():
                 if node in edge:
                     for next_node in edge:
                         if next_node != node:
@@ -100,6 +102,95 @@ class Hypergraph:
                     dist[i][j] = 0 
 
         return dist
+    
+    
+
+    
+    def earthmover_distance_gurobi_distance_matrix(self, node_A, node_B, distance_matrix):
+        '''
+        We will do this over two separate nodes. The directed script does all combos together, 
+        but might make sense to just do 2 nodes for now.
+        '''
+        # TODO: actually figure out the probability distributions. 
+        if node_A not in self.nodes or node_B not in self.nodes:
+            print(f"Node {node_A} or {node_B} does not exist in the hypergraph.")
+            return None  # Return None if either node does not exist
+        
+        '''Function to calculate EMD using the distance matrix (Optimized)'''
+        # Get the probability distributions for the specified hyperedge.
+        mu_A, mu_B = self.calculate_probability_distributions(hyperedge_id)
+
+        # Convert distributions from dictionary to list format and print for debugging
+        nodes_A = sorted(mu_A.keys())
+        nodes_B = sorted(mu_B.keys())
+        distribution1 = [mu_A[node] for node in nodes_A]
+        distribution2 = [mu_B[node] for node in nodes_B]
+    
+        # Print the distributions to verify correctness
+        print("Nodes in mu_A:", nodes_A)
+        print("Nodes in mu_B:", nodes_B)
+        print("Distribution mu_A:", distribution1)
+        print("Distribution mu_B:", distribution2)
+
+        # Check if distributions sum to the same value
+        total_mass_A = sum(distribution1)
+        total_mass_B = sum(distribution2)
+        print("Total mass in mu_A:", total_mass_A)
+        print("Total mass in mu_B:", total_mass_B)
+    
+        if abs(total_mass_A - total_mass_B) > 1e-6:
+            raise ValueError('The total mass of the distributions mu_A and mu_B are not equal.')
+        
+
+        # Create a mapping of nodes to their indices in the distance matrix.
+        node_to_index = {node: idx for idx, node in enumerate(self.nodes)}
+
+        
+        try:
+            model = Model("EarthMoverDistance")
+
+            # Set up the log file
+            log_filename = f"gurobi_log_{hyperedge_id}.log"
+            model.setParam('LogFile', log_filename)
+
+            variables = model.addVars(mu_A.keys(), mu_B.keys(), name="z", lb=0)
+
+            # Update the objective function to use the distance matrix.
+            model.setObjective(quicksum(distance_matrix[node_to_index[x]][node_to_index[y]] * variables[x, y]
+                                for x in mu_A for y in mu_B), GRB.MINIMIZE)
+
+            # Add constraints
+            for x in mu_A:
+                model.addConstr(quicksum(variables[x, y] for y in mu_B) == mu_A[x], f"dirt_leaving_{x}")
+
+            for y in mu_B:
+                model.addConstr(quicksum(variables[x, y] for x in mu_A) == mu_B[y], f"dirt_filling_{y}")
+
+            start_time = time.time()
+            model.optimize()
+            end_time = time.time()
+
+            time_taken = end_time - start_time
+
+            if model.status == GRB.OPTIMAL:
+                total_cost = model.getObjective().getValue()
+                print("Total EMD Cost:", total_cost)
+                print("Time taken to find the optimal solution: {:.4f} seconds".format(time_taken))
+
+                for x in mu_A:
+                    for y in mu_B:
+                        amount_moved = variables[x, y].X
+                        if amount_moved > 0:
+                            print(f"Move {amount_moved} from {x} to {y}")
+                return total_cost
+            else:
+                print("No optimal solution found.")
+                return None
+            
+        except Exception as e:
+            print(f"Gurobi Error: {e}")
+            return None
+
 
 
 class UndirectedHypergraph(Hypergraph):
@@ -166,6 +257,41 @@ def save_matrix_csv(matrix, filename:str) -> None:
     '''Function to save the matrix as a CSV file'''    
     pd.DataFrame(matrix).to_csv(filename, index=False, header=False)
 
+def update_orc_and_weights_iter(distance_matrix, iteration, file_format='csv'):
+    file_name = f'dataset_targeted_curvature_iteration_{iteration}.{file_format}'
+    
+    with open(file_name, 'a', newline='') as file:
+        if file_format == 'csv':
+            writer = csv.writer(file)
+            # Check if the file is empty to write headers
+            if file.tell() == 0:
+                writer.writerow(['Hyperedge ID', 'ORC', 'Weight'])
+            
+            for hyperedge_id in graph.hyperedges:
+                # TODO: Figure out the difference in Directed//Undirected
+                orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix)
+                # add the value to our graph
+                graph.add_ricci_curvature(hyperedge_id, orc)
+                # update the weights
+                weight = graph.weights[hyperedge_id][-1]
+                
+                if weight != 0:
+                    # TODO: This is where the weights are being updated now -- where they will have to be fixed
+                    weight = weight * (1 - orc)
+                    normalized_weight = adjusted_sigmoid_0_to_1(weight)
+                else:
+                    normalized_weight == 0
+
+                graph.add_weights(hyperedge_id, normalized_weight)
+                
+                writer.writerow([hyperedge_id, orc, normalized_weight])
+                
+def adjusted_sigmoid_0_to_1(x):
+    # Clip x to a range that prevents overflow in exp.
+    # The range of -709 to 709 is chosen based on the practical limits of np.exp()
+    x_clipped = np.clip(x, -709, 709)
+    a, b = 0, 1  # Define the target range
+    return a + (b - a) / (1 + np.exp(-x_clipped))
     
   
 if __name__ == "__main__": 
@@ -194,10 +320,11 @@ if __name__ == "__main__":
             print("Number of edges:",len(graph.hyperedges)) #Printing the number of hyperedges or papers in our network.
             print("Number of nodes",len(graph.nodes)) #Printing the number of nodes or authors in the network.
             # print('The actual nodes:', graph.nodes)
-            
-            # TODO: fix is weakly connected.
+
             connected = graph.is_weakly_connected()
             print("The hypergraph is weakly connected:" if connected else "The hypergraph is not weakly connected.")
+            
+            # TODO: get the stats of the graph (max, min, avg)
 
     distance_matrix = graph.floyd_warshall()
     save_matrix_csv(distance_matrix, 'outputfiles/undirected_testing_fw.csv')
@@ -205,6 +332,7 @@ if __name__ == "__main__":
     print('starting ricci curvature')
 
     #TODO: Same idea as in the directed Hypergraph script
+    
     #TODO: check to see if the guys are the same
     # update_orc_and_weights_iter0(distance_matrix,iteration=0)
     
