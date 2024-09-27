@@ -4,6 +4,7 @@ Idea: do a hypergraph and then subclasses
 
 import pandas as pd
 import csv
+import numpy as np
 
 class Hypergraph:
     def __init__(self):
@@ -104,8 +105,6 @@ class Hypergraph:
         return dist
     
     
-
-    
     def earthmover_distance_gurobi_distance_matrix(self, node_A, node_B, distance_matrix):
         '''
         We will do this over two separate nodes. The directed script does all combos together, 
@@ -190,7 +189,29 @@ class Hypergraph:
         except Exception as e:
             print(f"Gurobi Error: {e}")
             return None
+        
+        
+    def calculate_degrees(self):
+        #TODO: check this works for digraphs
+        '''Return the max degree, min degree, and average degree values. For Directed, we're get (in, out) pairs
+        '''
+        degrees = np.array([])
+        
+        # Iterate over each node in the hypergraph
+        for node in self.nodes:
+            degrees = np.append(degrees, graph.node_degree(node))
 
+        # If there are no nodes or degrees calculated, handle the case gracefully
+        if len(degrees) == 0:
+            max_degree = 0
+            min_degree = 0
+            avg_degree = 0.0
+        else:
+            max_degree = np.max(degrees, axis=0)
+            min_degree = np.min(degrees, axis=0)
+            avg_degree = np.sum(degrees, axis=0) / len(degrees)
+        
+        return max_degree, min_degree, avg_degree
 
 
 class UndirectedHypergraph(Hypergraph):
@@ -233,6 +254,13 @@ class UndirectedHypergraph(Hypergraph):
             # quit()
             self.add_hyperedge(edgeid, [node1, node2], verbose)
         return
+    
+    def node_degree(self, node):
+        """Calculate the degree of a node. Degree is the number of hyperedges containing this node."""
+        if node not in self.nodes:
+            raise ValueError("Node does not exist in the graph.")
+        return sum(node in hyperedge for hyperedge in self.hyperedges.values())
+    
   
 class DirectedHypergraph(Hypergraph):
     def add_hyperedge(self, hyperedge_id:str, tail_set:set, head_set:set):
@@ -252,6 +280,27 @@ class DirectedHypergraph(Hypergraph):
                     edge = frozenset([tail, head])
                     edges.add(edge)
         return edges
+    
+    def node_degree(self, node):
+        """Calculate the degree of a node. Degree is the number of hyperedges containing this node.
+        Will always return a numpy array (in-deg, out-deg)
+        """
+        if node not in self.nodes:
+            raise ValueError("Node does not exist in the graph.")
+        
+        d_in_x = 0
+        for _, (_, head_set) in self.hyperedges.items():
+            if node in head_set:
+                d_in_x += 1
+        
+        d_out_x = 0
+        for _, (tail_set, _) in self.hyperedges.items():
+            if node in tail_set:
+                d_out_x += 1
+        
+        return np.array([d_in_x, d_out_x])
+    
+    
     
 def save_matrix_csv(matrix, filename:str) -> None:
     '''Function to save the matrix as a CSV file'''    
@@ -298,13 +347,8 @@ if __name__ == "__main__":
     directed_flag = False 
     verbose = True
     
-    # TODO: make a simple graph data set. We need 2 graphs 
     data1 = pd.read_csv('inputfiles/petersengraph.csv', header=None, sep=',')
     data2 = pd.read_csv('inputfiles/petersengraphExtraEdge.csv', header=None, sep=',')
-    # print(data1.info())
-    # print(data1.head())
-    
-    # quit()
     
     #TODO: make a quick little test to make sure its a simple graph
     
@@ -324,7 +368,10 @@ if __name__ == "__main__":
             connected = graph.is_weakly_connected()
             print("The hypergraph is weakly connected:" if connected else "The hypergraph is not weakly connected.")
             
-            # TODO: get the stats of the graph (max, min, avg)
+            max_degree, min_degree, avg_degree = graph.calculate_degrees()
+            print(f"Max Degree: {max_degree}")
+            print(f"Min Degree: {min_degree}")
+            print(f"Average Degree: {avg_degree:.2f}")
 
     distance_matrix = graph.floyd_warshall()
     save_matrix_csv(distance_matrix, 'outputfiles/undirected_testing_fw.csv')
