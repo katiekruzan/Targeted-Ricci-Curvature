@@ -137,15 +137,17 @@ class Hypergraph:
         
         
     def calculate_degrees(self):
-        #TODO: check this works for digraphs
-        '''Return the max degree, min degree, and average degree values. For Directed, we're get (in, out) pairs
         '''
-        degrees = np.array([])
+        Return the max degree, min degree, and average degree values. For Directed, we're get (in, out) pairs
+        '''
+        degrees = []
         
         # Iterate over each node in the hypergraph
         for node in self.nodes:
-            degrees = np.append(degrees, graph.node_degree(node))
+            degrees.append(graph.node_degree(node))
 
+        degrees = np.array(degrees)
+        
         # If there are no nodes or degrees calculated, handle the case gracefully
         if len(degrees) == 0:
             max_degree = 0
@@ -154,7 +156,7 @@ class Hypergraph:
         else:
             max_degree = np.max(degrees, axis=0)
             min_degree = np.min(degrees, axis=0)
-            avg_degree = np.sum(degrees, axis=0) / len(degrees)
+            avg_degree = np.average(degrees, axis=0)
         
         return max_degree, min_degree, avg_degree
 
@@ -436,7 +438,7 @@ class DirectedHypergraph(Hypergraph):
             We're basically going to make it look like an undirected graph
         '''
         edges = dict()
-        print(self.hyperedges)
+        
         # quit()
         for key in self.hyperedges.keys():
             tail, head = self.hyperedges[key]
@@ -460,7 +462,7 @@ class DirectedHypergraph(Hypergraph):
             if node in tail_set:
                 d_out_x += 1
         
-        return np.array([d_in_x, d_out_x])
+        return [d_in_x, d_out_x]
     
     
     
@@ -531,11 +533,7 @@ if __name__ == "__main__":
             quit()
         if verbose:
             print('undirected')            
-            max_degree, min_degree, avg_degree = graph.calculate_degrees()
-            print(f"Max Degree: {max_degree}")
-            print(f"Min Degree: {min_degree}")
-            print(f"Average Degree: {avg_degree:.2f}")
-    
+                
     if verbose:
         print("Number of edges:",len(graph.hyperedges)) #Printing the number of hyperedges or papers in our network.
         print("Number of nodes",len(graph.nodes)) #Printing the number of nodes or authors in the network.
@@ -543,6 +541,12 @@ if __name__ == "__main__":
         
         connected = graph.is_weakly_connected()
         print("The hypergraph is weakly connected:" if connected else "The hypergraph is not weakly connected.")
+        
+        max_degree, min_degree, avg_degree = graph.calculate_degrees()
+        print(f"Max Degree: {max_degree}")
+        print(f"Min Degree: {min_degree}")
+        print(f"Average Degree: {avg_degree}")
+
 
 
     distance_matrix = graph.floyd_warshall()
