@@ -5,6 +5,8 @@ Idea: do a hypergraph and then subclasses
 import pandas as pd
 import csv
 import numpy as np
+from itertools import combinations
+from gurobipy import Model, GRB, quicksum
 
 class Hypergraph:
     def __init__(self):
@@ -32,6 +34,14 @@ class Hypergraph:
             Seems to be appending to a list.'''
         if weights is not None:
             self.weights[hyperedge_id].append(weights)
+            
+    def is_2_uniform(self) -> bool:
+        # need to check size of each edge is 2
+        # find a way to do this quicker
+        for edges in self.hyperedges.items():
+            if len(edges) != 2:
+                return False
+        return True
             
     def is_weakly_connected(self)-> bool:
         '''Check if the underlying graph is weakly connected
@@ -103,92 +113,6 @@ class Hypergraph:
                     dist[i][j] = 0 
 
         return dist
-    
-    
-    def earthmover_distance_gurobi_distance_matrix(self, node_A, node_B, distance_matrix):
-        '''
-        We will do this over two separate nodes. The directed script does all combos together, 
-        but might make sense to just do 2 nodes for now.
-        '''
-        # TODO: actually figure out the probability distributions. 
-        if node_A not in self.nodes or node_B not in self.nodes:
-            print(f"Node {node_A} or {node_B} does not exist in the hypergraph.")
-            return None  # Return None if either node does not exist
-        
-        '''Function to calculate EMD using the distance matrix (Optimized)'''
-        # Get the probability distributions for the specified hyperedge.
-        mu_A, mu_B = self.calculate_probability_distributions(hyperedge_id)
-
-        # Convert distributions from dictionary to list format and print for debugging
-        nodes_A = sorted(mu_A.keys())
-        nodes_B = sorted(mu_B.keys())
-        distribution1 = [mu_A[node] for node in nodes_A]
-        distribution2 = [mu_B[node] for node in nodes_B]
-    
-        # Print the distributions to verify correctness
-        print("Nodes in mu_A:", nodes_A)
-        print("Nodes in mu_B:", nodes_B)
-        print("Distribution mu_A:", distribution1)
-        print("Distribution mu_B:", distribution2)
-
-        # Check if distributions sum to the same value
-        total_mass_A = sum(distribution1)
-        total_mass_B = sum(distribution2)
-        print("Total mass in mu_A:", total_mass_A)
-        print("Total mass in mu_B:", total_mass_B)
-    
-        if abs(total_mass_A - total_mass_B) > 1e-6:
-            raise ValueError('The total mass of the distributions mu_A and mu_B are not equal.')
-        
-
-        # Create a mapping of nodes to their indices in the distance matrix.
-        node_to_index = {node: idx for idx, node in enumerate(self.nodes)}
-
-        
-        try:
-            model = Model("EarthMoverDistance")
-
-            # Set up the log file
-            log_filename = f"gurobi_log_{hyperedge_id}.log"
-            model.setParam('LogFile', log_filename)
-
-            variables = model.addVars(mu_A.keys(), mu_B.keys(), name="z", lb=0)
-
-            # Update the objective function to use the distance matrix.
-            model.setObjective(quicksum(distance_matrix[node_to_index[x]][node_to_index[y]] * variables[x, y]
-                                for x in mu_A for y in mu_B), GRB.MINIMIZE)
-
-            # Add constraints
-            for x in mu_A:
-                model.addConstr(quicksum(variables[x, y] for y in mu_B) == mu_A[x], f"dirt_leaving_{x}")
-
-            for y in mu_B:
-                model.addConstr(quicksum(variables[x, y] for x in mu_A) == mu_B[y], f"dirt_filling_{y}")
-
-            start_time = time.time()
-            model.optimize()
-            end_time = time.time()
-
-            time_taken = end_time - start_time
-
-            if model.status == GRB.OPTIMAL:
-                total_cost = model.getObjective().getValue()
-                print("Total EMD Cost:", total_cost)
-                print("Time taken to find the optimal solution: {:.4f} seconds".format(time_taken))
-
-                for x in mu_A:
-                    for y in mu_B:
-                        amount_moved = variables[x, y].X
-                        if amount_moved > 0:
-                            print(f"Move {amount_moved} from {x} to {y}")
-                return total_cost
-            else:
-                print("No optimal solution found.")
-                return None
-            
-        except Exception as e:
-            print(f"Gurobi Error: {e}")
-            return None
         
         
     def calculate_degrees(self):
@@ -218,8 +142,6 @@ class UndirectedHypergraph(Hypergraph):
     def add_hyperedge(self, hyperedge_id:str, nodes:list, verbose=True):
         """Add a hyperedge to the hypergraph. Automatically adds missing nodes."""
         # Ensure nodes is a list
-        # print(nodes)
-        # quit()
         if not isinstance(nodes, list):
             raise ValueError("Nodes must be provided as a list")
         
@@ -260,6 +182,204 @@ class UndirectedHypergraph(Hypergraph):
         if node not in self.nodes:
             raise ValueError("Node does not exist in the graph.")
         return sum(node in hyperedge for hyperedge in self.hyperedges.values())
+    
+    
+    def find_hyperedges_containing_nodes(self, *nodes):
+        '''
+        Find hyperedges that contain any of the specified nodes.
+        # Ensure input is treated as a list even if a single node is passed
+        if isinstance(nodes, str):
+            nodes = [nodes]  # Convert single string node to a list
+        '''
+        nodes_set = set(nodes)  # Convert list to set for efficient intersection checks
+
+        # Handle different types of inputs
+        for node in nodes:
+            if isinstance(node, (list, set, tuple)):  # If the input is any kind of collection
+                nodes_set.update(node)  # Add all elements to the set
+            else:
+                nodes_set.add(node)  # Add the single element to the set
+
+        found_hyperedges = []
+        # Ensure all nodes in the set are in our nodes list
+        if not nodes_set.issubset(self.nodes):
+            print("Some nodes are not in the hypergraph.")
+        
+        # Iterate through all hyperedges
+        for hyperedge_id, hyperedge_nodes in self.hyperedges.items():
+            if nodes_set.intersection(hyperedge_nodes):  # Check if intersection is not empty
+                found_hyperedges.append(hyperedge_id)
+        
+        return found_hyperedges
+    
+    def neighbours(self, node):
+        """
+        Find all nodes that share at least one hyperedge with the specified node.
+
+        :param node: The node for which to find neighbors.
+        :return: A set of neighboring nodes.
+        """
+        if node not in self.nodes:
+            return set()  # Return an empty set if the node does not exist
+
+        neighbours = set()
+        # Iterate through all hyperedges
+        for hyperedge in self.hyperedges.values():
+            if node in hyperedge:
+                neighbours.update(hyperedge)  # Add all nodes in the hyperedge
+
+        neighbours.discard(node)  # Remove the node itself from the set of neighbours
+        return neighbours
+    
+    def node_probability(self, node):
+        alpha = 0.1  # Self-transition probability factor
+        probability_distribution = {n: 0.0 for n in self.nodes}  # Initialize probabilities
+
+        if node not in self.nodes:
+            raise ValueError("Node does not exist in the hypergraph.")
+
+        # Calculate the denominator: sum of (|f| - 1) for all f containing node
+        denominator = 0
+        hyperedges_containing_node = self.find_hyperedges_containing_nodes(node)
+        for hyperedge_id in hyperedges_containing_node:
+            hyperedge = self.hyperedges[hyperedge_id]
+            denominator += (len(hyperedge) - 1)
+
+        if denominator == 0:
+            # If the denominator is zero, we should handle this edge case gracefully.
+            probability_distribution[node] = 1.0
+            return probability_distribution
+
+        # Calculate the numerator for each neighbor node j and update their probabilities
+        for neighbour in self.neighbours(node):
+            hyperedges_containing_both = self.find_hyperedges_containing_nodes(node, neighbour)
+            numerator = len(hyperedges_containing_both)
+            '''
+            for hyperedge_id in hyperedges_containing_both:
+                hyperedge = self.hyperedges[hyperedge_id]
+                numerator += (len(hyperedge))
+            '''
+            # Update the probability of transitioning to the neighbor
+            probability_distribution[neighbour] = (1 - alpha) * numerator / denominator
+
+        # Assign the self-loop probability
+        probability_distribution[node] = alpha
+
+        # Normalization step
+        
+        total_probability = sum(probability_distribution.values())
+        for n in probability_distribution:
+            probability_distribution[n] /= total_probability
+        
+        return probability_distribution
+    
+    
+    def earthmover_distance_gurobi_distance_matrix(self, node_A, node_B, distance_matrix):
+        if node_A not in self.nodes or node_B not in self.nodes:
+            print(f"Node {node_A} or {node_B} does not exist in the hypergraph.")
+            return None  # Return None if either node does not exist
+        
+        # Get the probability distributions for the two specified nodes.
+        mu_A = self.node_probability(node_A)
+        mu_B = self.node_probability(node_B)
+
+        # Convert distributions from dictionary to list format 
+        nodes_A = sorted(mu_A.keys())
+        nodes_B = sorted(mu_B.keys())
+        distribution1 = [mu_A[node] for node in nodes_A]
+        distribution2 = [mu_B[node] for node in nodes_B]
+
+        # Check if distributions sum to the same value
+        total_mass_A = sum(distribution1)
+        total_mass_B = sum(distribution2)
+    
+        if abs(total_mass_A - total_mass_B) > 1e-6:
+            # TODO: improve error message
+            raise ValueError('The total mass of the distributions mu_A and mu_B are not equal. For')
+        
+
+        # Create a mapping of nodes to their indices in the distance matrix.
+        node_to_index = {node: idx for idx, node in enumerate(list(self.nodes))}
+
+        try:
+            # Create a new model in Gurobi.
+            model = Model("EarthMoverDistance")
+
+            # Set up the log file
+            #log_filename = f"gurobi_log_{hyperedge_id}.log"
+            # Set up the log file
+            '''
+            log_filename = f"gurobi_log_{hyperedge_id}.log"
+            model.setParam('LogFile', log_filename)
+            '''
+            #model.setParam('OutputFlag', 1)
+            # Create variables for the linear program.
+            variables = model.addVars(mu_A.keys(), mu_B.keys(), name="z", lb=0)
+
+            # Set the objective of the linear program to minimize the total cost.
+            model.setObjective(quicksum(distance_matrix[node_to_index[x]][node_to_index[y]] * variables[x, y]
+                                for x in mu_A for y in mu_B), GRB.MINIMIZE)
+
+            # Add constraints to ensure the conservation of mass.
+            for x in mu_A:
+                model.addConstr(quicksum(variables[x, y] for y in mu_B) == mu_A[x], f"dirt_leaving_{x}")
+
+            for y in mu_B:
+                model.addConstr(quicksum(variables[x, y] for x in mu_A) == mu_B[y], f"dirt_filling_{y}")
+
+            # Start the timer, solve the model, and calculate the time taken.
+            model.optimize()
+
+            # Check the model status and process the results.
+            if model.status == GRB.OPTIMAL:
+                total_cost = model.getObjective().getValue()
+                return total_cost
+            else:
+                #TODO: add more info for this error
+                print(f"No optimal solution found for nodes {node_A} and {node_B}")
+                return None
+
+        except Exception as e:
+            print(f"Gurobi Error: {e}\n for nodes {node_A} and {node_B}")
+            return None
+
+    
+    
+    def earthmover_distance_hyperedge_combinations(self, hyperedge_id, distance_matrix):
+        """
+        This buddy gets the average EMD across the whole edge
+        :param hyperedge_id: The identifier for the hyperedge.
+        :return: The average EMD for all permutations of node pairs, or None if the hyperedge does not exist or has errors.
+        """
+        if hyperedge_id not in self.hyperedges:
+            print(f"Hyperedge {hyperedge_id} does not exist.")
+            return None
+        
+        nodes = self.hyperedges[hyperedge_id]
+
+        if len(nodes) < 2:
+            return 1
+        
+        sum_emd = 0
+        pair_count = 0
+        # Generate all combinations of pairs of nodes
+        for node_A, node_B in combinations(nodes, 2):
+            emd = self.earthmover_distance_gurobi_distance_matrix(node_A, node_B, distance_matrix)
+            if emd is not None:
+                sum_emd += emd
+                pair_count += 1
+
+        if pair_count > 0:
+            # Compute the average EMD
+            average_emd = sum_emd /pair_count
+            weight = self.weights[hyperedge_id][-1]
+            if weight == 0:
+                return 1 - average_emd
+            else:
+                return 1 - average_emd/weight
+        else:
+            print(f"No valid EMD computations were possible. For hyperedge {hyperedge_id}")
+            return None
     
   
 class DirectedHypergraph(Hypergraph):
@@ -318,7 +438,9 @@ def update_orc_and_weights_iter(distance_matrix, iteration, file_format='csv'):
             
             for hyperedge_id in graph.hyperedges:
                 # TODO: Figure out the difference in Directed//Undirected
-                orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix)
+                #TODO: right now, implement Undirected
+                if isinstance(graph, UndirectedHypergraph):
+                    orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix)
                 # add the value to our graph
                 graph.add_ricci_curvature(hyperedge_id, orc)
                 # update the weights
@@ -349,16 +471,20 @@ if __name__ == "__main__":
     
     data1 = pd.read_csv('inputfiles/petersengraph.csv', header=None, sep=',')
     data2 = pd.read_csv('inputfiles/petersengraphExtraEdge.csv', header=None, sep=',')
-    
-    #TODO: make a quick little test to make sure its a simple graph
-    
+        
     if directed_flag:
         graph = DirectedHypergraph()
+        if not graph.is_2_uniform():
+            print('This has not been fully fleshed out for hypergraphs. Please give a 2-uniform graph').__annotations__
+            quit()
         if verbose:
             print('directed')
     else:
         graph = UndirectedHypergraph()
         graph.build_from_dataframe(data1, verbose)
+        if not graph.is_2_uniform():
+            print('This has not been fully fleshed out for hypergraphs. Please give a 2-uniform graph').__annotations__
+            quit()
         if verbose:
             print('undirected')
             print("Number of edges:",len(graph.hyperedges)) #Printing the number of hyperedges or papers in our network.
@@ -378,10 +504,11 @@ if __name__ == "__main__":
 
     print('starting ricci curvature')
 
-    #TODO: Same idea as in the directed Hypergraph script
+    #TODO: Same idea as in the undirected Hypergraph script
     
     #TODO: check to see if the guys are the same
-    # update_orc_and_weights_iter0(distance_matrix,iteration=0)
+    #TODO: Need gurobi for this to work. Need the Liscence on campus
+    # update_orc_and_weights_iter(distance_matrix,iteration=0)
     
     print('Itteration 0 done')
  
