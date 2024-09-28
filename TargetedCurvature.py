@@ -51,7 +51,6 @@ class Hypergraph:
             return True
 
         if isinstance(self, DirectedHypergraph):
-            # TODO: Get is_weakly_connected to work for Directed
             edges = self.get_underlying_edges()
         else: edges = self.hyperedges
         
@@ -80,35 +79,57 @@ class Hypergraph:
   
     
     def floyd_warshall(self):
-        # TODO: double check this works for both and with weights
-        node_list = list(self.nodes)
-        index = {node: idx for idx, node in enumerate(node_list)}
-        n = len(node_list)
-        dist = [[float('inf') for _ in range(n)] for _ in range(n)]
+        # Initialize the distance matrix with "infinite" distances
+        # Assume self.nodes is a list or set of nodes
+        node_list = list(self.nodes) # Convert to list to ensure consistent ordering
+        node_count = len(node_list)
         
-        for i in range(n):
+        # Create a mapping of node to index
+        node_index = {node: idx for idx, node in enumerate(node_list)}
+
+        # Initialize a 2D list (matrix) with "infinite" distances
+        dist = [[float('inf') for _ in range(node_count)] for _ in range(node_count)]
+        
+        # Set the diagonal to 0 (distance from each node to itself)
+        for i in range(node_count):
             dist[i][i] = 0
         
+        # Set the distance for directly connected nodes based on edge weights
         for hyperedge_id, nodes in self.hyperedges.items():
-            weight = self.weights[hyperedge_id][-1]
-            for i in range(len(nodes)):
-                for j in range(i + 1, len(nodes)):
-                    idx_i = index[nodes[i]]
-                    idx_j = index[nodes[j]]
-                    if dist[idx_i][idx_j] > weight:
-                        dist[idx_i][idx_j] = weight
-                        dist[idx_j][idx_i] = weight  # Graph is undirected
-
-        for k in range(n):
-            for i in range(n):
-                for j in range(n):
-                    if dist[i][j] > dist[i][k] + dist[k][j]:
-                        dist[i][j] = dist[i][k] + dist[k][j]
-                        dist[j][i] = dist[i][j]
+            if isinstance(graph, UndirectedHypergraph):
+                tail_set, head_set = nodes, nodes
+            else: 
+                tail_set, head_set = nodes
+            
+            # set distances within tail set and head set to 0
+            #TODO: test this when it comes to actual hypergraphs
+            '''
+            for tail in tail_set:
+                for another_tail in tail_set:
+                    if tail != another_tail:
+                        dist[node_index[tail]][node_index[another_tail]] = 0
+            for head in head_set:
+                for another_head in head_set:
+                    if head != another_head:
+                        dist[node_index[head]][node_index[another_head]] = 0
+            '''
+          
+            for tail in tail_set:
+                for head in head_set:
+                    # Update the distance with the weight of the edge
+                    # Assuming edge_id is used to access weights; adjust accordingly
+                    dist[node_index[tail]][node_index[head]] = min(dist[node_index[tail]][node_index[head]],self.weights[hyperedge_id][-1])  # Using the last weight in the list
+        
+        # Floyd-Warshall algorithm to update distances
+        for k in self.nodes:
+            for i in self.nodes:
+                for j in self.nodes:
+                    if dist[node_index[i]][node_index[k]] + dist[node_index[k]][node_index[j]] < dist[node_index[i]][node_index[j]]:
+                        dist[node_index[i]][node_index[j]] = dist[node_index[i]][node_index[k]] + dist[node_index[k]][node_index[j]]
 
         # Replace 'inf' with 0 for pairs of nodes that have no path between them
-        for i in range(n):
-            for j in range(n):
+        for i in range(node_count):
+            for j in range(node_count):
                 if dist[i][j] == float('inf'):
                     dist[i][j] = 0 
 
@@ -384,21 +405,42 @@ class UndirectedHypergraph(Hypergraph):
   
 class DirectedHypergraph(Hypergraph):
     def add_hyperedge(self, hyperedge_id:str, tail_set:set, head_set:set):
-        '''Function to add a hyperedge to the hypergraph'''
+        '''Function to add a hyperedge to the hypergraph, if the nodes are not there, will add the nodes'''
+        # Add missing nodes to the node set
+        for node in tail_set.union(head_set):
+            if node not in self.nodes:
+                self.add_node(node)
+        
         self.hyperedges[hyperedge_id] = (tail_set, head_set)
         self.weights[hyperedge_id]=[1] # init the weight to 1
         
+
+    def build_from_dataframe(self, df:pd.DataFrame, verbose=True):
+        '''Build hypergraph from a DataFrame'''
+        if verbose:
+            print(self.nodes)
+            print(self.hyperedges)
+        # make an edge from each row in the csv
+        for _, row in df.iterrows():
+            node1 = row[0].strip() #start
+            node2 = row[1].strip() #end
+            edgeid = node1 + '_to_' + node2
+            self.add_hyperedge(edgeid, set(node1), set(node2))
+            if verbose:
+                print(f'Added hyperedge {edgeid} with head set {node1} and tail set {node2}')
+        return
+    
+            
     def get_underlying_edges(self) -> set:
         '''Function to get the edges from the hyperedges.
-            Extract all edges from the hyperedges. 
-            These are all possible connections (aka turn hypergraph into simple graph)
+            We're basically going to make it look like an undirected graph
         '''
-        edges = set()
-        for tail_set, head_set in self.hyperedges.values():
-            for tail in tail_set:
-                for head in head_set:
-                    edge = frozenset([tail, head])
-                    edges.add(edge)
+        edges = dict()
+        print(self.hyperedges)
+        # quit()
+        for key in self.hyperedges.keys():
+            tail, head = self.hyperedges[key]
+            edges[key] = list(set(tail.union(head)))
         return edges
     
     def node_degree(self, node):
@@ -427,7 +469,7 @@ def save_matrix_csv(matrix, filename:str) -> None:
     pd.DataFrame(matrix).to_csv(filename, index=False, header=False)
 
 def update_orc_and_weights_iter(distance_matrix, iteration, file_format='csv'):
-    file_name = f'dataset_targeted_curvature_iteration_{iteration}.{file_format}'
+    file_name = f'outputfiles/dataset_targeted_curvature_iteration_{iteration}.{file_format}'
     
     with open(file_name, 'a', newline='') as file:
         if file_format == 'csv':
@@ -466,7 +508,7 @@ def adjusted_sigmoid_0_to_1(x):
     
   
 if __name__ == "__main__": 
-    directed_flag = False 
+    directed_flag = True
     verbose = True
     
     data1 = pd.read_csv('inputfiles/petersengraph.csv', header=None, sep=',')
@@ -474,11 +516,13 @@ if __name__ == "__main__":
         
     if directed_flag:
         graph = DirectedHypergraph()
+        graph.build_from_dataframe(data1, verbose)
         if not graph.is_2_uniform():
             print('This has not been fully fleshed out for hypergraphs. Please give a 2-uniform graph').__annotations__
             quit()
         if verbose:
             print('directed')
+
     else:
         graph = UndirectedHypergraph()
         graph.build_from_dataframe(data1, verbose)
@@ -486,23 +530,25 @@ if __name__ == "__main__":
             print('This has not been fully fleshed out for hypergraphs. Please give a 2-uniform graph').__annotations__
             quit()
         if verbose:
-            print('undirected')
-            print("Number of edges:",len(graph.hyperedges)) #Printing the number of hyperedges or papers in our network.
-            print("Number of nodes",len(graph.nodes)) #Printing the number of nodes or authors in the network.
-            # print('The actual nodes:', graph.nodes)
-
-            connected = graph.is_weakly_connected()
-            print("The hypergraph is weakly connected:" if connected else "The hypergraph is not weakly connected.")
-            
+            print('undirected')            
             max_degree, min_degree, avg_degree = graph.calculate_degrees()
             print(f"Max Degree: {max_degree}")
             print(f"Min Degree: {min_degree}")
             print(f"Average Degree: {avg_degree:.2f}")
+    
+    if verbose:
+        print("Number of edges:",len(graph.hyperedges)) #Printing the number of hyperedges or papers in our network.
+        print("Number of nodes",len(graph.nodes)) #Printing the number of nodes or authors in the network.
+        print('The actual nodes:', graph.nodes)
+        
+        connected = graph.is_weakly_connected()
+        print("The hypergraph is weakly connected:" if connected else "The hypergraph is not weakly connected.")
+
 
     distance_matrix = graph.floyd_warshall()
-    save_matrix_csv(distance_matrix, 'outputfiles/undirected_testing_fw.csv')
+    save_matrix_csv(distance_matrix, 'outputfiles/directed_testing_fw.csv')
 
-    print('starting ricci curvature')
+    # print('starting ricci curvature')
 
     #TODO: Same idea as in the undirected Hypergraph script
     
