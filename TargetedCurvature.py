@@ -78,7 +78,7 @@ class Hypergraph:
         return visited == self.nodes   
   
     
-    def floyd_warshall(self):
+    def floyd_warshall(self) -> list[list]:
         # Initialize the distance matrix with "infinite" distances
         # Assume self.nodes is a list or set of nodes
         node_list = list(self.nodes) # Convert to list to ensure consistent ordering
@@ -96,7 +96,7 @@ class Hypergraph:
         
         # Set the distance for directly connected nodes based on edge weights
         for hyperedge_id, nodes in self.hyperedges.items():
-            if isinstance(graph, UndirectedHypergraph):
+            if isinstance(self, UndirectedHypergraph):
                 tail_set, head_set = nodes, nodes
             else: 
                 tail_set, head_set = nodes
@@ -144,7 +144,7 @@ class Hypergraph:
         
         # Iterate over each node in the hypergraph
         for node in self.nodes:
-            degrees.append(graph.node_degree(node))
+            degrees.append(self.node_degree(node))
 
         degrees = np.array(degrees)
         
@@ -186,18 +186,15 @@ class UndirectedHypergraph(Hypergraph):
     
     def build_from_dataframe(self, df:pd.DataFrame, verbose=True):
         '''Build hypergraph from a DataFrame'''
-        print(self.nodes)
-        print(self.hyperedges)
-        # quit()
         # make an edge from each row in the csv
         #TODO: make this more general?
         for _, row in df.iterrows():
             node1 = row[0].strip() #start
             node2 = row[1].strip() #end
             edgeid = node1 + '_to_' + node2
-            # print(node1, node2, edgeid)
-            # quit()
             self.add_hyperedge(edgeid, [node1, node2], verbose)
+            if verbose:
+                print(f'Added hyperedge {edgeid} between {node1} and {node2}')
         return
     
     def node_degree(self, node):
@@ -419,9 +416,6 @@ class DirectedHypergraph(Hypergraph):
 
     def build_from_dataframe(self, df:pd.DataFrame, verbose=True):
         '''Build hypergraph from a DataFrame'''
-        if verbose:
-            print(self.nodes)
-            print(self.hyperedges)
         # make an edge from each row in the csv
         for _, row in df.iterrows():
             node1 = row[0].strip() #start
@@ -439,7 +433,6 @@ class DirectedHypergraph(Hypergraph):
         '''
         edges = dict()
         
-        # quit()
         for key in self.hyperedges.keys():
             tail, head = self.hyperedges[key]
             edges[key] = list(set(tail.union(head)))
@@ -470,7 +463,7 @@ def save_matrix_csv(matrix, filename:str) -> None:
     '''Function to save the matrix as a CSV file'''    
     pd.DataFrame(matrix).to_csv(filename, index=False, header=False)
 
-def update_orc_and_weights_iter(distance_matrix, iteration, file_format='csv'):
+def update_orc_and_weights_iter(distance_matrix:list[list], graph:Hypergraph, targ_graph:Hypergraph,  iteration:int, file_format='csv'):
     file_name = f'outputfiles/dataset_targeted_curvature_iteration_{iteration}.{file_format}'
     
     with open(file_name, 'a', newline='') as file:
@@ -489,18 +482,37 @@ def update_orc_and_weights_iter(distance_matrix, iteration, file_format='csv'):
                 graph.add_ricci_curvature(hyperedge_id, orc)
                 # update the weights
                 weight = graph.weights[hyperedge_id][-1]
+                alpha = .5
+                beta = 0
+                orc_targ = targ_graph.ricci_curvature[hyperedge_id][-1]
                 
                 if weight != 0:
                     # TODO: This is where the weights are being updated now -- where they will have to be fixed
-                    weight = weight * (1 - orc)
-                    normalized_weight = adjusted_sigmoid_0_to_1(weight)
+                    wtplus1 = weight*((1 + (alpha * beta)/4) - (alpha/4)*(orc - orc_targ + beta))
+                    normalized_weight = adjusted_sigmoid_0_to_1(wtplus1)
                 else:
                     normalized_weight == 0
 
                 graph.add_weights(hyperedge_id, normalized_weight)
                 
                 writer.writerow([hyperedge_id, orc, normalized_weight])
-                
+ 
+def calculate_target_orc(distance_matrix: list[list], graph:Hypergraph, file_format='csv'):
+    file_name = f'outputfiles/dataset_target_graph_orc.{file_format}'
+    
+    with open(file_name, 'a', newline='') as file:
+        writer = csv.writer(file)
+        # Check if the file is empty to write headers
+        if file.tell() == 0:
+            writer.writerow(['Hyperedge ID', 'ORC', 'Weight'])
+        
+        for hyperedge_id in graph.hyperedges:
+            if isinstance(graph, UndirectedHypergraph):
+                orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix)
+            graph.add_ricci_curvature(hyperedge_id, orc)
+            writer.writerow([hyperedge_id, orc])  
+    return
+               
 def adjusted_sigmoid_0_to_1(x):
     # Clip x to a range that prevents overflow in exp.
     # The range of -709 to 709 is chosen based on the practical limits of np.exp()
@@ -510,57 +522,64 @@ def adjusted_sigmoid_0_to_1(x):
     
   
 if __name__ == "__main__": 
-    directed_flag = True
+    directed_flag = False
     verbose = True
     
+    #TODO: make a clean up function for the output files
+    
+    #For now, the nodes have to be labeled the same way. We're going to assume the hyperedges are going to be labeled the same.
     data1 = pd.read_csv('inputfiles/petersengraph.csv', header=None, sep=',')
     data2 = pd.read_csv('inputfiles/petersengraphExtraEdge.csv', header=None, sep=',')
         
     if directed_flag:
-        graph = DirectedHypergraph()
-        graph.build_from_dataframe(data1, verbose)
-        if not graph.is_2_uniform():
-            print('This has not been fully fleshed out for hypergraphs. Please give a 2-uniform graph').__annotations__
-            quit()
-        if verbose:
-            print('directed')
-
+        source_graph = DirectedHypergraph()
+        target_graph = DirectedHypergraph()
     else:
-        graph = UndirectedHypergraph()
-        graph.build_from_dataframe(data1, verbose)
-        if not graph.is_2_uniform():
-            print('This has not been fully fleshed out for hypergraphs. Please give a 2-uniform graph').__annotations__
-            quit()
-        if verbose:
-            print('undirected')            
-                
+        source_graph = UndirectedHypergraph()
+        target_graph = UndirectedHypergraph()          
+              
+    source_graph.build_from_dataframe(data1, verbose)
+    target_graph.build_from_dataframe(data2, verbose)
+    if not (source_graph.is_2_uniform() and target_graph.is_2_uniform()) :
+        print('This has not been fully fleshed out for hypergraphs. Please give a 2-uniform graph')
+        quit()
+         
     if verbose:
-        print("Number of edges:",len(graph.hyperedges)) #Printing the number of hyperedges or papers in our network.
-        print("Number of nodes",len(graph.nodes)) #Printing the number of nodes or authors in the network.
-        print('The actual nodes:', graph.nodes)
+        print('type of graph', type(source_graph))
+        print("Number of edges:",len(source_graph.hyperedges)) #Printing the number of hyperedges or papers in our network.
+        print("Number of nodes",len(source_graph.nodes)) #Printing the number of nodes or authors in the network.
+        print('The actual nodes:', source_graph.nodes)
         
-        connected = graph.is_weakly_connected()
+        connected = source_graph.is_weakly_connected()
         print("The hypergraph is weakly connected:" if connected else "The hypergraph is not weakly connected.")
         
-        max_degree, min_degree, avg_degree = graph.calculate_degrees()
+        max_degree, min_degree, avg_degree = source_graph.calculate_degrees()
         print(f"Max Degree: {max_degree}")
         print(f"Min Degree: {min_degree}")
         print(f"Average Degree: {avg_degree}")
 
-
-
-    distance_matrix = graph.floyd_warshall()
-    save_matrix_csv(distance_matrix, 'outputfiles/directed_testing_fw.csv')
+    distance_matrix = source_graph.floyd_warshall()
+    save_matrix_csv(distance_matrix, 'outputfiles/undirected_testing_fw.csv')
+    
+    target_distance_matrix = target_graph.floyd_warshall()
+    save_matrix_csv(target_distance_matrix, 'outputfiles/undirected_target_graph_fw.csv')
 
     # print('starting ricci curvature')
 
     #TODO: Same idea as in the undirected Hypergraph script
     
     #TODO: check to see if the guys are the same
-    #TODO: Need gurobi for this to work. Need the Liscence on campus
-    # update_orc_and_weights_iter(distance_matrix,iteration=0)
+    calculate_target_orc(target_distance_matrix, target_graph)
+    update_orc_and_weights_iter(distance_matrix,source_graph, target_graph, iteration=0)
+    # quit()
     
-    print('Itteration 0 done')
- 
+    #TODO: So i think we want to run this guy until we are stable (within some error bound?) We also want to be able to mess with the covergence params
+    total_iterations = 5
+    for i in range(1, total_iterations + 1):
+        print('Working on itteration', i)
+        distance_matrix_i = source_graph.floyd_warshall()
+        filename = f'outputfiles/distance_matrix_normalized_weights_{i}.csv'
+        save_matrix_csv(distance_matrix_i, filename)
+        update_orc_and_weights_iter(distance_matrix, source_graph, target_graph, iteration=i)
             
     # print('hey')
