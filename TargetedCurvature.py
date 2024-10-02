@@ -7,6 +7,8 @@ import csv
 import numpy as np
 from itertools import combinations
 from gurobipy import Model, GRB, quicksum
+import time
+import os
 
 class Hypergraph:
     def __init__(self):
@@ -518,13 +520,32 @@ def adjusted_sigmoid_0_to_1(x):
     x_clipped = np.clip(x, -709, 709)
     a, b = 0, 1  # Define the target range
     return a + (b - a) / (1 + np.exp(-x_clipped))
+
+def clean_output(verbose):
+    files = os.listdir('outputfiles')
+    now = time.time()
+    if not os.path.isdir(f'outputfiles/{now}'):
+        os.makedirs(f'outputfiles/{now}')
+    for f in files:
+        if f=='README.md' or os.path.isdir(f'outputfiles/{f}'):
+            continue
+        else:
+            try:
+                os.rename(f'outputfiles/{f}', f'outputfiles/{now}/{f}')
+                if verbose:
+                    print(f'moving {f} to {now}/{f}')
+            except:
+                print(f'Had issues moving {f} to a new folder')
+    return
+    
     
   
 if __name__ == "__main__": 
     directed_flag = False
     verbose = True
     
-    #TODO: make a clean up function for the output files
+    clean_output(verbose)
+    # quit()
     
     #For now, the nodes have to be labeled the same way. We're going to assume the hyperedges are going to be labeled the same.
     data1 = pd.read_csv('inputfiles/petersengraph.csv', header=None, sep=',')
@@ -564,10 +585,8 @@ if __name__ == "__main__":
     save_matrix_csv(target_distance_matrix, 'outputfiles/undirected_target_graph_fw.csv')
 
     # print('starting ricci curvature')
-
-    #TODO: Same idea as in the undirected Hypergraph script
     
-    #TODO: check to see if the guys are the same
+    #TODO: check to see if the guys are Known Node Correspondence
     calculate_target_orc(target_distance_matrix, target_graph)
     update_orc_and_weights_iter(distance_matrix,source_graph, target_graph, iteration=0)
     # quit()
