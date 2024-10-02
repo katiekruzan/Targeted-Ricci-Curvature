@@ -465,6 +465,7 @@ def save_matrix_csv(matrix, filename:str) -> None:
     '''Function to save the matrix as a CSV file'''    
     pd.DataFrame(matrix).to_csv(filename, index=False, header=False)
 
+
 def update_orc_and_weights_iter(distance_matrix:list[list], graph:Hypergraph, targ_graph:Hypergraph,  iteration:int, file_format='csv'):
     file_name = f'outputfiles/dataset_targeted_curvature_iteration_{iteration}.{file_format}'
     
@@ -477,7 +478,6 @@ def update_orc_and_weights_iter(distance_matrix:list[list], graph:Hypergraph, ta
             
             for hyperedge_id in graph.hyperedges:
                 # TODO: Figure out the difference in Directed//Undirected
-                #TODO: right now, implement Undirected
                 if isinstance(graph, UndirectedHypergraph):
                     orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix)
                 # add the value to our graph
@@ -498,6 +498,7 @@ def update_orc_and_weights_iter(distance_matrix:list[list], graph:Hypergraph, ta
                 
                 writer.writerow([hyperedge_id, orc, normalized_weight])
  
+ 
 def calculate_target_orc(distance_matrix: list[list], graph:Hypergraph, file_format='csv'):
     file_name = f'outputfiles/dataset_target_graph_orc.{file_format}'
     
@@ -513,6 +514,7 @@ def calculate_target_orc(distance_matrix: list[list], graph:Hypergraph, file_for
             graph.add_ricci_curvature(hyperedge_id, orc)
             writer.writerow([hyperedge_id, orc])  
     return
+             
                
 def adjusted_sigmoid_0_to_1(x):
     # Clip x to a range that prevents overflow in exp.
@@ -520,6 +522,7 @@ def adjusted_sigmoid_0_to_1(x):
     x_clipped = np.clip(x, -709, 709)
     a, b = 0, 1  # Define the target range
     return a + (b - a) / (1 + np.exp(-x_clipped))
+
 
 def clean_output(verbose):
     files = os.listdir('outputfiles')
@@ -541,11 +544,11 @@ def clean_output(verbose):
     
   
 if __name__ == "__main__": 
+    # TODO: implement Ricci for Directed
     directed_flag = False
     verbose = True
     
     clean_output(verbose)
-    # quit()
     
     #For now, the nodes have to be labeled the same way. We're going to assume the hyperedges are going to be labeled the same.
     data1 = pd.read_csv('inputfiles/petersengraph.csv', header=None, sep=',')
