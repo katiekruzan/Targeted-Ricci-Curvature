@@ -603,14 +603,10 @@ if __name__ == "__main__":
     calculate_target_orc(target_distance_matrix, target_graph, verbose)
     update_orc_and_weights_iter(distance_matrix, source_graph, target_graph, iteration=0, verbose=verbose)
     
-    #TODO: So i think we want to run this guy until we are stable (within some error bound?) We also want to be able to mess with the covergence params
-    # TODO: make it more sustinct in terminal
     total_iterations = 100
     for i in range(1, total_iterations + 1):
         print('Working on itteration', i)
         distance_matrix_i = source_graph.floyd_warshall()
-        # filename = f'outputfiles/distance_matrix_normalized_weights_{i}.csv'
-        # save_matrix_csv(distance_matrix_i, filename)
         update_orc_and_weights_iter(distance_matrix, source_graph, target_graph, iteration=i, verbose=verbose)
         allstable = True
         finustab = None
@@ -646,14 +642,15 @@ if __name__ == "__main__":
     source_graph.build_from_dataframe(data_target, verbose)
     target_graph.build_from_dataframe(data_source, verbose)
     distance_matrix = source_graph.floyd_warshall()    
-    # target_distance_matrix = target_graph.floyd_warshall()
-    
+    target_distance_matrix = target_graph.floyd_warshall()
+    print(source_graph.hyperedges)
+    calculate_target_orc(target_distance_matrix, target_graph, verbose)
+    update_orc_and_weights_iter(distance_matrix, source_graph, target_graph, iteration=0, verbose=verbose)
+    verbose = True
     for i in range(1, total_iterations + 1):
         print('Working on itteration', i)
         distance_matrix_i = source_graph.floyd_warshall()
-        # filename = f'outputfiles/op_distance_matrix_normalized_weights_{i}.csv'
-        # save_matrix_csv(distance_matrix_i, filename)
-        update_orc_and_weights_iter(distance_matrix, source_graph, target_graph, iteration=i, verbose=verbose, op_flag=True)
+        update_orc_and_weights_iter(distance_matrix, source_graph, target_graph, iteration=i, verbose=False, op_flag=True)
         allstable = True
         finustab = None
         for e in source_graph.hyperedges:
