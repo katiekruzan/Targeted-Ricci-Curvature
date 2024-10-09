@@ -503,7 +503,7 @@ def update_orc_and_weights_iter(distance_matrix:list[list], graph:Hypergraph, ta
             for hyperedge_id in graph.hyperedges:
                 # TODO: Figure out the difference in Directed//Undirected
                 if isinstance(graph, UndirectedHypergraph):
-                    orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose)
+                    orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose=False)
                 # add the value to our graph
                 graph.add_ricci_curvature(hyperedge_id, orc)
                 # update the weights
@@ -514,7 +514,8 @@ def update_orc_and_weights_iter(distance_matrix:list[list], graph:Hypergraph, ta
                 
                 if weight != 0:
                     wtplus1 = weight*((1 + (alpha * beta)/4) - (alpha/4)*(orc - orc_targ + beta))
-                    normalized_weight = adjusted_sigmoid_0_to_1(wtplus1)
+                    # normalized_weight = adjusted_sigmoid_0_to_1(wtplus1)
+                    normalized_weight = wtplus1
                 else:
                     normalized_weight == 0
 
@@ -537,7 +538,7 @@ def calculate_target_orc(distance_matrix: list[list], graph:Hypergraph, verbose,
         
         for hyperedge_id in graph.hyperedges:
             if isinstance(graph, UndirectedHypergraph):
-                orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose)
+                orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose = False)
             graph.add_ricci_curvature(hyperedge_id, orc)
             weight = graph.weights[hyperedge_id][-1]
             writer.writerow([hyperedge_id, orc, weight])  
@@ -574,7 +575,7 @@ def clean_output(verbose):
 if __name__ == "__main__": 
     # TODO: implement Ricci for Directed
     directed_flag = False
-    verbose = False
+    verbose = True
     
     clean_output(verbose)
     
