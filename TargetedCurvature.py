@@ -164,7 +164,7 @@ class Hypergraph:
 
 
 class UndirectedHypergraph(Hypergraph):
-    def add_hyperedge(self, hyperedge_id:str, nodes:list, verbose=True):
+    def add_hyperedge(self, hyperedge_id:str, nodes:list, weight_list = [1], verbose=True):
         """Add a hyperedge to the hypergraph. Automatically adds missing nodes."""
         # Ensure nodes is a list
         if not isinstance(nodes, list):
@@ -183,18 +183,19 @@ class UndirectedHypergraph(Hypergraph):
         if verbose:
             f'Adding hyperedge {hyperedge_id} with nodes {nodes}'
         self.hyperedges[hyperedge_id] = nodes
-        self.weights[hyperedge_id] = [1] #init the weights to 1
+        self.weights[hyperedge_id] = weight_list #init the weights to 1
         return
     
     def build_from_dataframe(self, df:pd.DataFrame, verbose=True):
         '''Build hypergraph from a DataFrame'''
         # make an edge from each row in the csv
-        #TODO: make this more general?
+        #TODO: make this more general? Be able to catch errors
         for _, row in df.iterrows():
             node1 = row[0].strip() #start
             node2 = row[1].strip() #end
+            weight = float(row[2])
             edgeid = node1 + '_to_' + node2
-            self.add_hyperedge(edgeid, [node1, node2], verbose)
+            self.add_hyperedge(edgeid, [node1, node2], [weight], verbose)
             if verbose:
                 print(f'Added hyperedge {edgeid} between {node1} and {node2}')
         return
@@ -296,7 +297,7 @@ class UndirectedHypergraph(Hypergraph):
         return probability_distribution
     
     
-    def earthmover_distance_gurobi_distance_matrix(self, node_A, node_B, distance_matrix):
+    def earthmover_distance_gurobi_distance_matrix(self, node_A, node_B, distance_matrix, verbose):
         if node_A not in self.nodes or node_B not in self.nodes:
             print(f"Node {node_A} or {node_B} does not exist in the hypergraph.")
             return None  # Return None if either node does not exist
@@ -337,6 +338,10 @@ class UndirectedHypergraph(Hypergraph):
             #model.setParam('OutputFlag', 1)
             # Create variables for the linear program.
             variables = model.addVars(mu_A.keys(), mu_B.keys(), name="z", lb=0)
+            
+            # Should make it less verbose
+            if not verbose:
+                model.Params.LogToConsole = 0
 
             # Set the objective of the linear program to minimize the total cost.
             model.setObjective(quicksum(distance_matrix[node_to_index[x]][node_to_index[y]] * variables[x, y]
@@ -367,7 +372,7 @@ class UndirectedHypergraph(Hypergraph):
 
     
     
-    def earthmover_distance_hyperedge_combinations(self, hyperedge_id, distance_matrix):
+    def earthmover_distance_hyperedge_combinations(self, hyperedge_id, distance_matrix, verbose):
         """
         This buddy gets the average EMD across the whole edge
         :param hyperedge_id: The identifier for the hyperedge.
@@ -386,7 +391,7 @@ class UndirectedHypergraph(Hypergraph):
         pair_count = 0
         # Generate all combinations of pairs of nodes
         for node_A, node_B in combinations(nodes, 2):
-            emd = self.earthmover_distance_gurobi_distance_matrix(node_A, node_B, distance_matrix)
+            emd = self.earthmover_distance_gurobi_distance_matrix(node_A, node_B, distance_matrix, verbose)
             if emd is not None:
                 sum_emd += emd
                 pair_count += 1
@@ -405,7 +410,7 @@ class UndirectedHypergraph(Hypergraph):
     
   
 class DirectedHypergraph(Hypergraph):
-    def add_hyperedge(self, hyperedge_id:str, tail_set:set, head_set:set):
+    def add_hyperedge(self, hyperedge_id:str, tail_set:set, head_set:set, weight_list = [1]):
         '''Function to add a hyperedge to the hypergraph, if the nodes are not there, will add the nodes'''
         # Add missing nodes to the node set
         for node in tail_set.union(head_set):
@@ -413,7 +418,7 @@ class DirectedHypergraph(Hypergraph):
                 self.add_node(node)
         
         self.hyperedges[hyperedge_id] = (tail_set, head_set)
-        self.weights[hyperedge_id]=[1] # init the weight to 1
+        self.weights[hyperedge_id]=[weight_list] # init the weight to 1
         
 
     def build_from_dataframe(self, df:pd.DataFrame, verbose=True):
@@ -422,8 +427,9 @@ class DirectedHypergraph(Hypergraph):
         for _, row in df.iterrows():
             node1 = row[0].strip() #start
             node2 = row[1].strip() #end
+            weight = float(row[2].strip())
             edgeid = node1 + '_to_' + node2
-            self.add_hyperedge(edgeid, set(node1), set(node2))
+            self.add_hyperedge(edgeid, set(node1), set(node2), [weight])
             if verbose:
                 print(f'Added hyperedge {edgeid} with head set {node1} and tail set {node2}')
         return
@@ -466,8 +472,11 @@ def save_matrix_csv(matrix, filename:str) -> None:
     pd.DataFrame(matrix).to_csv(filename, index=False, header=False)
 
 
-def update_orc_and_weights_iter(distance_matrix:list[list], graph:Hypergraph, targ_graph:Hypergraph,  iteration:int, file_format='csv'):
-    file_name = f'outputfiles/dataset_targeted_curvature_iteration_{iteration}.{file_format}'
+def update_orc_and_weights_iter(distance_matrix:list[list], graph:Hypergraph, targ_graph:Hypergraph,  iteration:int, verbose, file_format='csv', op_flag = False):
+    if op_flag:
+        file_name = f'outputfiles/op_dataset_targeted_curvature_iteration_{iteration}.{file_format}'
+    else:
+        file_name = f'outputfiles/dataset_targeted_curvature_iteration_{iteration}.{file_format}'
     
     with open(file_name, 'a', newline='') as file:
         if file_format == 'csv':
@@ -479,12 +488,12 @@ def update_orc_and_weights_iter(distance_matrix:list[list], graph:Hypergraph, ta
             for hyperedge_id in graph.hyperedges:
                 # TODO: Figure out the difference in Directed//Undirected
                 if isinstance(graph, UndirectedHypergraph):
-                    orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix)
+                    orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose)
                 # add the value to our graph
                 graph.add_ricci_curvature(hyperedge_id, orc)
                 # update the weights
                 weight = graph.weights[hyperedge_id][-1]
-                alpha = .5
+                alpha = 4
                 beta = 0
                 orc_targ = targ_graph.ricci_curvature[hyperedge_id][-1]
                 
@@ -499,7 +508,7 @@ def update_orc_and_weights_iter(distance_matrix:list[list], graph:Hypergraph, ta
                 writer.writerow([hyperedge_id, orc, normalized_weight])
  
  
-def calculate_target_orc(distance_matrix: list[list], graph:Hypergraph, file_format='csv'):
+def calculate_target_orc(distance_matrix: list[list], graph:Hypergraph, verbose, file_format='csv'):
     file_name = f'outputfiles/dataset_target_graph_orc.{file_format}'
     
     with open(file_name, 'a', newline='') as file:
@@ -510,9 +519,10 @@ def calculate_target_orc(distance_matrix: list[list], graph:Hypergraph, file_for
         
         for hyperedge_id in graph.hyperedges:
             if isinstance(graph, UndirectedHypergraph):
-                orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix)
+                orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose)
             graph.add_ricci_curvature(hyperedge_id, orc)
-            writer.writerow([hyperedge_id, orc])  
+            weight = graph.weights[hyperedge_id][-1]
+            writer.writerow([hyperedge_id, orc, weight])  
     return
              
                
@@ -546,13 +556,13 @@ def clean_output(verbose):
 if __name__ == "__main__": 
     # TODO: implement Ricci for Directed
     directed_flag = False
-    verbose = True
+    verbose = False
     
     clean_output(verbose)
     
     #For now, the nodes have to be labeled the same way. We're going to assume the hyperedges are going to be labeled the same.
-    data1 = pd.read_csv('inputfiles/petersengraph.csv', header=None, sep=',')
-    data2 = pd.read_csv('inputfiles/petersengraphExtraEdge.csv', header=None, sep=',')
+    data_source = pd.read_csv('inputfiles/petersengraph.csv', header=None, sep=',')
+    data_target = pd.read_csv('inputfiles/petersengraph_newweights.csv', header=None, sep=',')
         
     if directed_flag:
         source_graph = DirectedHypergraph()
@@ -561,8 +571,8 @@ if __name__ == "__main__":
         source_graph = UndirectedHypergraph()
         target_graph = UndirectedHypergraph()          
               
-    source_graph.build_from_dataframe(data1, verbose)
-    target_graph.build_from_dataframe(data2, verbose)
+    source_graph.build_from_dataframe(data_source, verbose)
+    target_graph.build_from_dataframe(data_target, verbose)
     if not (source_graph.is_2_uniform() and target_graph.is_2_uniform()) :
         print('This has not been fully fleshed out for hypergraphs. Please give a 2-uniform graph')
         quit()
@@ -587,20 +597,81 @@ if __name__ == "__main__":
     target_distance_matrix = target_graph.floyd_warshall()
     save_matrix_csv(target_distance_matrix, 'outputfiles/undirected_target_graph_fw.csv')
 
-    # print('starting ricci curvature')
+    print('starting ricci curvature')
     
     #TODO: check to see if the guys are Known Node Correspondence
-    calculate_target_orc(target_distance_matrix, target_graph)
-    update_orc_and_weights_iter(distance_matrix,source_graph, target_graph, iteration=0)
-    # quit()
+    calculate_target_orc(target_distance_matrix, target_graph, verbose)
+    update_orc_and_weights_iter(distance_matrix, source_graph, target_graph, iteration=0, verbose=verbose)
     
     #TODO: So i think we want to run this guy until we are stable (within some error bound?) We also want to be able to mess with the covergence params
-    total_iterations = 5
+    # TODO: make it more sustinct in terminal
+    total_iterations = 100
     for i in range(1, total_iterations + 1):
         print('Working on itteration', i)
         distance_matrix_i = source_graph.floyd_warshall()
-        filename = f'outputfiles/distance_matrix_normalized_weights_{i}.csv'
-        save_matrix_csv(distance_matrix_i, filename)
-        update_orc_and_weights_iter(distance_matrix, source_graph, target_graph, iteration=i)
+        # filename = f'outputfiles/distance_matrix_normalized_weights_{i}.csv'
+        # save_matrix_csv(distance_matrix_i, filename)
+        update_orc_and_weights_iter(distance_matrix, source_graph, target_graph, iteration=i, verbose=verbose)
+        allstable = True
+        finustab = None
+        for e in source_graph.hyperedges:
+            wlist = source_graph.weights[e]
+            old = wlist[-2]
+            new = wlist[-1]
+            error = abs((old-new)/old)
+            if error > 0.05:
+                if verbose:
+                    print('unstable for edge ', e, ' with error ', error)
+                finustab = e
+                allstable = False
+                break
+        if allstable:
+            print('STABILIZED! Source to target distance is ',i)
+            break
             
-    # print('hey')
+    if not allstable:
+        # print(target_graph.weights)
+        print(source_graph.weights[finustab])
+        
+    # Go the other way
+    print('Now checking Target to Source....')
+    if directed_flag:
+        source_graph = DirectedHypergraph()
+        target_graph = DirectedHypergraph()
+    else:
+        source_graph = UndirectedHypergraph()
+        target_graph = UndirectedHypergraph()          
+    
+    # swap them
+    source_graph.build_from_dataframe(data_target, verbose)
+    target_graph.build_from_dataframe(data_source, verbose)
+    distance_matrix = source_graph.floyd_warshall()    
+    # target_distance_matrix = target_graph.floyd_warshall()
+    
+    for i in range(1, total_iterations + 1):
+        print('Working on itteration', i)
+        distance_matrix_i = source_graph.floyd_warshall()
+        # filename = f'outputfiles/op_distance_matrix_normalized_weights_{i}.csv'
+        # save_matrix_csv(distance_matrix_i, filename)
+        update_orc_and_weights_iter(distance_matrix, source_graph, target_graph, iteration=i, verbose=verbose, op_flag=True)
+        allstable = True
+        finustab = None
+        for e in source_graph.hyperedges:
+            wlist = source_graph.weights[e]
+            old = wlist[-2]
+            new = wlist[-1]
+            error = abs((old-new)/old)
+            if error > 0.05:
+                if verbose:
+                    print('unstable for edge ', e, ' with error ', error)
+                finustab = e
+                allstable = False
+                break
+        if allstable:
+            print('STABILIZED! Source to target distance is ',i)
+            break
+            
+    if not allstable:
+        # print(target_graph.weights)
+        print(source_graph.weights[finustab])
+    
