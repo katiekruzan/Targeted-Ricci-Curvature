@@ -186,6 +186,15 @@ class UndirectedHypergraph(Hypergraph):
         self.weights[hyperedge_id] = weight_list #init the weights to 1
         return
     
+    def add_missing_target_edges(self, targ_graph:Hypergraph, verbose):
+        for e in set(targ_graph.hyperedges) - set(self.hyperedges):
+            self.add_hyperedge(e, targ_graph.hyperedges[e], [np.inf], verbose)
+            
+    def add_missing_source_edges(self, src_graph:Hypergraph, verbose):
+        for e in set(src_graph.hyperedges) - set(self.hyperedges):
+            self.add_hyperedge(e, src_graph.hyperedges[e], [0], verbose)
+        
+    
     def build_from_dataframe(self, df:pd.DataFrame, verbose=True):
         '''Build hypergraph from a DataFrame'''
         # make an edge from each row in the csv
@@ -420,6 +429,12 @@ class DirectedHypergraph(Hypergraph):
         self.hyperedges[hyperedge_id] = (tail_set, head_set)
         self.weights[hyperedge_id]=[weight_list] # init the weight to 1
         
+    def add_missing_target_edges(self, targ_graph:Hypergraph):
+        #TODO: check if this works for Digraphs
+        for e in set(targ_graph.hyperedges) - set(self.hyperedges):
+            self.add_hyperedge(e, targ_graph.hyperedges[e][0], targ_graph.hyperedges[e][1], targ_graph.weights[e])
+
+        
 
     def build_from_dataframe(self, df:pd.DataFrame, verbose=True):
         '''Build hypergraph from a DataFrame'''
@@ -508,8 +523,11 @@ def update_orc_and_weights_iter(distance_matrix:list[list], graph:Hypergraph, ta
                 writer.writerow([hyperedge_id, orc, normalized_weight])
  
  
-def calculate_target_orc(distance_matrix: list[list], graph:Hypergraph, verbose, file_format='csv'):
-    file_name = f'outputfiles/dataset_target_graph_orc.{file_format}'
+def calculate_target_orc(distance_matrix: list[list], graph:Hypergraph, verbose, file_format='csv', op_flag=False):
+    if op_flag:
+        file_name = f'outputfiles/op_dataset_target_graph_orc.{file_format}'
+    else:
+        file_name = f'outputfiles/dataset_target_graph_orc.{file_format}'
     
     with open(file_name, 'a', newline='') as file:
         writer = csv.writer(file)
@@ -561,9 +579,15 @@ if __name__ == "__main__":
     clean_output(verbose)
     
     #For now, the nodes have to be labeled the same way. We're going to assume the hyperedges are going to be labeled the same.
-    data_source = pd.read_csv('inputfiles/petersengraph.csv', header=None, sep=',')
-    data_target = pd.read_csv('inputfiles/petersengraph_newweights.csv', header=None, sep=',')
-        
+    # This section works
+    # data_source = pd.read_csv('inputfiles/petersengraph.csv', header=None, sep=',')
+    # data_target = pd.read_csv('inputfiles/petersengraph_newweights.csv', header=None, sep=',')
+    # data_source = pd.read_csv('inputfiles/petersengraph.csv', header=None, sep=',')
+    # data_target = pd.read_csv('inputfiles/petersengraphExtraEdge.csv', header=None, sep=',')
+    
+    data_source = pd.read_csv('inputfiles/petersengraph_newweights.csv', header=None, sep=',')  
+    data_target = pd.read_csv('inputfiles/petersengraphExtraEdge.csv', header=None, sep=',')  
+    
     if directed_flag:
         source_graph = DirectedHypergraph()
         target_graph = DirectedHypergraph()
@@ -596,8 +620,14 @@ if __name__ == "__main__":
     
     target_distance_matrix = target_graph.floyd_warshall()
     save_matrix_csv(target_distance_matrix, 'outputfiles/undirected_target_graph_fw.csv')
-
+    
+    if set(target_graph.hyperedges) != set(source_graph.hyperedges):
+        print ('Taking care of missing edges')
+        # add edges that are in the target but not the source
+        source_graph.add_missing_target_edges(target_graph, verbose)
+        
     print('starting ricci curvature')
+    
     
     #TODO: check to see if the guys are Known Node Correspondence
     calculate_target_orc(target_distance_matrix, target_graph, verbose)
@@ -615,7 +645,7 @@ if __name__ == "__main__":
             old = wlist[-2]
             new = wlist[-1]
             error = abs((old-new)/old)
-            if error > 0.05:
+            if error > 0.01:
                 if verbose:
                     print('unstable for edge ', e, ' with error ', error)
                 finustab = e
@@ -641,12 +671,19 @@ if __name__ == "__main__":
     # swap them
     source_graph.build_from_dataframe(data_target, verbose)
     target_graph.build_from_dataframe(data_source, verbose)
+    
+    if set(target_graph.hyperedges) != set(source_graph.hyperedges):
+        print ('Taking care of missing edges')
+        # add edges that are in the target but not the source
+        source_graph.add_missing_target_edges(target_graph, verbose)
+        target_graph.add_missing_source_edges(source_graph, verbose)
+        
     distance_matrix = source_graph.floyd_warshall()    
     target_distance_matrix = target_graph.floyd_warshall()
     print(source_graph.hyperedges)
-    calculate_target_orc(target_distance_matrix, target_graph, verbose)
-    update_orc_and_weights_iter(distance_matrix, source_graph, target_graph, iteration=0, verbose=verbose)
-    verbose = True
+    calculate_target_orc(target_distance_matrix, target_graph, verbose, op_flag=True)
+    update_orc_and_weights_iter(distance_matrix, source_graph, target_graph, iteration=0, verbose=verbose, op_flag=True)
+    # verbose = True
     for i in range(1, total_iterations + 1):
         print('Working on itteration', i)
         distance_matrix_i = source_graph.floyd_warshall()
@@ -658,7 +695,7 @@ if __name__ == "__main__":
             old = wlist[-2]
             new = wlist[-1]
             error = abs((old-new)/old)
-            if error > 0.05:
+            if error > 0.01:
                 if verbose:
                     print('unstable for edge ', e, ' with error ', error)
                 finustab = e
