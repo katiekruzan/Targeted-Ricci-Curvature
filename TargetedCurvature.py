@@ -37,6 +37,16 @@ class Hypergraph:
         if weights is not None:
             self.weights[hyperedge_id].append(weights)
             
+    def normalize_weights(self) -> None:
+        ''' Normalize the weights of the edges as suggested in the proposal (divide by the total weight)'''
+        all_weights = [self.weights[e][-1] for e in self.weights.keys() if self.weights[e][-1] != np.inf]
+        tot_weight = sum(all_weights)
+        # print(tot_weight)
+        for edge_id in self.hyperedges.keys():
+            recent_w = self.weights[edge_id][-1]
+            new_w = recent_w/tot_weight
+            self.add_weights(edge_id, new_w)
+            
     def is_2_uniform(self) -> bool:
         # need to check size of each edge is 2
         # find a way to do this quicker
@@ -508,20 +518,24 @@ def update_orc_and_weights_iter(distance_matrix:list[list], graph:Hypergraph, ta
                 graph.add_ricci_curvature(hyperedge_id, orc)
                 # update the weights
                 weight = graph.weights[hyperedge_id][-1]
-                alpha = 4
-                beta = 0
-                orc_targ = targ_graph.ricci_curvature[hyperedge_id][-1]
-                
-                if weight != 0:
-                    wtplus1 = weight*((1 + (alpha * beta)/4) - (alpha/4)*(orc - orc_targ + beta))
-                    # normalized_weight = adjusted_sigmoid_0_to_1(wtplus1)
-                    normalized_weight = wtplus1
-                else:
-                    normalized_weight == 0
+                if iteration != 0:
+                    alpha = 4
+                    beta = 0
+                    orc_targ = targ_graph.ricci_curvature[hyperedge_id][-1]
+                    
+                    if weight != 0:
+                        wtplus1 = weight*((1 + (alpha * beta)/4) - (alpha/4)*(orc - orc_targ + beta))
+                        normalized_weight = adjusted_sigmoid_0_to_1(wtplus1)
+                        # normalized_weight = wtplus1
+                    else:
+                        normalized_weight = 0
 
-                graph.add_weights(hyperedge_id, normalized_weight)
+                    graph.add_weights(hyperedge_id, normalized_weight)
                 
-                writer.writerow([hyperedge_id, orc, normalized_weight])
+                    writer.writerow([hyperedge_id, orc, normalized_weight])
+                else: 
+                    print('got here to write the information')
+                    writer.writerow([hyperedge_id, orc, weight])
  
  
 def calculate_target_orc(distance_matrix: list[list], graph:Hypergraph, verbose, file_format='csv', op_flag=False):
@@ -581,13 +595,13 @@ if __name__ == "__main__":
     
     #For now, the nodes have to be labeled the same way. We're going to assume the hyperedges are going to be labeled the same.
     # This section works
-    # data_source = pd.read_csv('inputfiles/petersengraph.csv', header=None, sep=',')
-    # data_target = pd.read_csv('inputfiles/petersengraph_newweights.csv', header=None, sep=',')
+    data_source = pd.read_csv('inputfiles/petersengraph.csv', header=None, sep=',')
+    data_target = pd.read_csv('inputfiles/petersengraph_newweights.csv', header=None, sep=',')
     # data_source = pd.read_csv('inputfiles/petersengraph.csv', header=None, sep=',')
     # data_target = pd.read_csv('inputfiles/petersengraphExtraEdge.csv', header=None, sep=',')
     
-    data_source = pd.read_csv('inputfiles/petersengraph_newweights.csv', header=None, sep=',')  
-    data_target = pd.read_csv('inputfiles/petersengraphExtraEdge.csv', header=None, sep=',')  
+    # data_source = pd.read_csv('inputfiles/petersengraph_newweights.csv', header=None, sep=',')  
+    # data_target = pd.read_csv('inputfiles/petersengraphExtraEdge.csv', header=None, sep=',')  
     
     if directed_flag:
         source_graph = DirectedHypergraph()
@@ -629,10 +643,20 @@ if __name__ == "__main__":
         
     print('starting ricci curvature')
     
+    # Normalize the edge weights. Doing so as suggested in the proposal (basically divide the weights by total weight (excluding inf))
+    print('Normalizing the weights')
+    source_graph.normalize_weights()
+    target_graph.normalize_weights()
+    if verbose:
+        print(source_graph.weights)
+        print(target_graph.weights)
+    # quit()
     
+    #TODO: there is ORC < -2 Which is bad news bears??
     #TODO: check to see if the guys are Known Node Correspondence
     calculate_target_orc(target_distance_matrix, target_graph, verbose)
     update_orc_and_weights_iter(distance_matrix, source_graph, target_graph, iteration=0, verbose=verbose)
+    quit()
     
     total_iterations = 100
     for i in range(1, total_iterations + 1):
@@ -645,7 +669,9 @@ if __name__ == "__main__":
             wlist = source_graph.weights[e]
             old = wlist[-2]
             new = wlist[-1]
-            error = abs((old-new)/old)
+            if old != 0:
+                error = abs((old-new)/old)
+            else: error = abs(old-new)
             if error > 0.01:
                 if verbose:
                     print('unstable for edge ', e, ' with error ', error)
@@ -679,6 +705,9 @@ if __name__ == "__main__":
         source_graph.add_missing_target_edges(target_graph, verbose)
         target_graph.add_missing_source_edges(source_graph, verbose)
         
+    source_graph.normalize_weights()
+    target_graph.normalize_weights()
+        
     distance_matrix = source_graph.floyd_warshall()    
     target_distance_matrix = target_graph.floyd_warshall()
     print(source_graph.hyperedges)
@@ -696,6 +725,7 @@ if __name__ == "__main__":
             old = wlist[-2]
             new = wlist[-1]
             error = abs((old-new)/old)
+            # error = abs(old-new)
             if error > 0.01:
                 if verbose:
                     print('unstable for edge ', e, ' with error ', error)
