@@ -198,7 +198,7 @@ class UndirectedHypergraph(Hypergraph):
         if verbose:
             f'Adding hyperedge {hyperedge_id} with nodes {nodes}'
         self.hyperedges[hyperedge_id] = nodes
-        self.weights[hyperedge_id] = weight_list #init the weights to 1
+        self.weights[hyperedge_id] = weight_list #init the weights to [1]
         return
     
     def add_missing_target_edges(self, targ_graph:Hypergraph, targ_dist_mat, verbose):
@@ -283,6 +283,7 @@ class UndirectedHypergraph(Hypergraph):
         return neighbours
     
     def node_probability(self, node):
+        #TODO: Note this is wrong for directed graphs
         alpha = 0.1  # Self-transition probability factor
         probability_distribution = {n: 0.0 for n in self.nodes}  # Initialize probabilities
 
@@ -291,11 +292,20 @@ class UndirectedHypergraph(Hypergraph):
 
         # Calculate the denominator: sum of (|f| - 1) for all f containing node
         denominator = 0
-        hyperedges_containing_node = self.find_hyperedges_containing_nodes(node)
+        hyperedges_containing_node = self.find_hyperedges_containing_nodes(node) # the part that's no good for directed
         for hyperedge_id in hyperedges_containing_node:
             hyperedge = self.hyperedges[hyperedge_id]
             denominator += (len(hyperedge) - 1)
-
+        
+        '''
+        # Calculate the denominator: sum of weight(f) for all f containing node
+        denominator = 0
+        hyperedges_containing_node = self.find_hyperedges_containing_nodes(node)
+        for hyperedge_id in hyperedges_containing_node:
+            hyperedge_weight = self.weights[hyperedge_id]
+            denominator += hyperedge_weight
+        '''
+            
         if denominator == 0:
             # If the denominator is zero, we should handle this edge case gracefully.
             probability_distribution[node] = 1.0
@@ -332,6 +342,9 @@ class UndirectedHypergraph(Hypergraph):
         # Get the probability distributions for the two specified nodes.
         mu_A = self.node_probability(node_A)
         mu_B = self.node_probability(node_B)
+        if True:
+            print('The node', node_B, 'has distribution', mu_B)
+            quit()
 
         # Convert distributions from dictionary to list format 
         nodes_A = sorted(mu_A.keys())
@@ -391,6 +404,9 @@ class UndirectedHypergraph(Hypergraph):
             else:
                 #TODO: add more info for this error
                 print(f"No optimal solution found for nodes {node_A} and {node_B}")
+                print(f"The probability distributions are A: {mu_A} \nAnd B: {mu_B}")
+                print('Model Status', model.status)
+                print(f"The masses are {total_mass_A} for A and {total_mass_B} for B")
                 return None
 
         except Exception as e:
@@ -418,18 +434,24 @@ class UndirectedHypergraph(Hypergraph):
         pair_count = 0
         # Generate all combinations of pairs of nodes
         for node_A, node_B in combinations(nodes, 2):
-            emd = self.earthmover_distance_gurobi_distance_matrix(node_A, node_B, distance_matrix, True)
+            emd = self.earthmover_distance_gurobi_distance_matrix(node_A, node_B, distance_matrix, False)
+            print(f'emd is {emd} on nodes {node_A} and {node_B}')
+            
             if emd is not None:
                 sum_emd += emd
                 pair_count += 1
+            else:
+                print('emd is none on nodes ', node_A, 'and', node_B)
 
         if pair_count > 0:
             # Compute the average EMD
             average_emd = sum_emd /pair_count
             weight = self.weights[hyperedge_id][-1]
             if weight == 0:
+                # this is the orc #TODO: check to see if this makes sense for weight =0 in a real way
                 return 1 - average_emd
             else:
+                # this is the orc. This is the EMD/dist(u,v) and dist(u,v) will just be the weight of the edge
                 return 1 - average_emd/weight
         else:
             print(f"No valid EMD computations were possible. For hyperedge {hyperedge_id}")
@@ -515,22 +537,25 @@ def update_orc_and_weights_iter(distance_matrix:list[list], graph:Hypergraph, ta
             writer = csv.writer(file)
             # Check if the file is empty to write headers
             if file.tell() == 0:
-                writer.writerow(['Hyperedge ID', 'ORC', 'Weight'])
+                writer.writerow(['Hyperedge ID', 'ORC: (based on t-1 weights)', 'Weight:t'])
             
             for hyperedge_id in graph.hyperedges:
                 # TODO: Figure out the difference in Directed//Undirected
                 if isinstance(graph, UndirectedHypergraph):
                     orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose=False)
+                if iteration ==2:
+                    print(hyperedge_id, orc)
+                    quit()
                 # Normalize the curvature
                 # normalized_orc = ricci_normalizing(orc)
                 # un-normalizing
                 normalized_orc = orc
                 # add the value to our graph
                 graph.add_ricci_curvature(hyperedge_id, normalized_orc)
-                # update the weights
+                # grab the latest weight the weights
                 weight = graph.weights[hyperedge_id][-1]
                 if iteration != 0:
-                    alpha = 4
+                    alpha = 1
                     beta = 0
                     orc_targ = targ_graph.ricci_curvature[hyperedge_id][-1]
                     
@@ -554,7 +579,6 @@ def calculate_target_orc(distance_matrix: list[list], graph:Hypergraph, verbose,
     else:
         file_name = f'outputfiles/dataset_target_graph_orc.{file_format}'
     
-    print('target weights init:', graph.weights)
     with open(file_name, 'a', newline='') as file:
         writer = csv.writer(file)
         # Check if the file is empty to write headers
@@ -611,7 +635,6 @@ if __name__ == "__main__":
     # average absolute difference and see if that's small
     # try a network such that the sum of the two weights are the same
     '''
-    0. make a 50 node ER network
     
     1. don't normalize, then look through and see if its scale invariant, see if there's a multiplier
     
@@ -639,9 +662,11 @@ if __name__ == "__main__":
     And the nodes must be labeled the same in both graphs for this to work
     '''
     
-    data_source = pd.read_csv('inputfiles/ERgraph50nodesweight1.csv', dtype ={'source': str, 'target':str}, sep=',')  
-    data_target = pd.read_csv('inputfiles/ERgraph50nodesweight3.csv', dtype ={'source': str, 'target':str}, sep=',')  
-    
+    # data_target = pd.read_csv('inputfiles/ERgraph50nodesweight1.csv', dtype ={'source': str, 'target':str}, sep=',')  
+    # data_source = pd.read_csv('inputfiles/ERgraph50nodesweight3.csv', dtype ={'source': str, 'target':str}, sep=',')  
+    data_target = pd.read_csv('inputfiles/petersengraph.csv', dtype ={'source': str, 'target':str}, sep=',')  
+    data_source = pd.read_csv('inputfiles/petersengraph_bigedges.csv', dtype ={'source': str, 'target':str}, sep=',')  
+
     
     if directed_flag:
         source_graph = DirectedHypergraph()
