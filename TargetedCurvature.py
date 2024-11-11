@@ -541,10 +541,10 @@ def update_orc_and_weights_iter(distance_matrix:list[list], graph:Hypergraph, ta
             for hyperedge_id in graph.hyperedges:
                 # TODO: Figure out the difference in Directed//Undirected
                 if isinstance(graph, UndirectedHypergraph):
-                    orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose=True)
-                quit()
-                # if iteration ==2:
-                #     print(hyperedge_id, orc)
+                    orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose=False)
+                # quit()
+                if iteration ==2:
+                    print(hyperedge_id, orc)
                     # quit()
                 # Normalize the curvature
                 # normalized_orc = ricci_normalizing(orc)
@@ -662,12 +662,14 @@ if __name__ == "__main__":
     And the nodes must be labeled the same in both graphs for this to work
     '''
     
-    data_target = pd.read_csv('inputfiles/ERgraph50nodesweight1.csv', dtype ={'source': str, 'target':str}, sep=',')  
-    data_source = pd.read_csv('inputfiles/ERgraph50nodesincr.csv', dtype ={'source': str, 'target':str}, sep=',')  
+    # data_target = pd.read_csv('inputfiles/ERgraph50nodesweight1.csv', dtype ={'source': str, 'target':str}, sep=',')  
+    # data_source = pd.read_csv('inputfiles/ERgraph50nodesincr.csv', dtype ={'source': str, 'target':str}, sep=',')  
     # data_target = pd.read_csv('inputfiles/petersengraph.csv', dtype ={'source': str, 'target':str}, sep=',')  
     # data_source = pd.read_csv('inputfiles/petersengraph_bigedges.csv', dtype ={'source': str, 'target':str}, sep=',')  
     # data_target = pd.read_csv('inputfiles/petersengraph.csv', dtype ={'source': str, 'target':str}, sep=',')  
     # data_source = pd.read_csv('inputfiles/petersengraph_newweights.csv', dtype ={'source': str, 'target':str}, sep=',')  
+    data_target = pd.read_csv('inputfiles/petersengraph.csv', dtype ={'source': str, 'target':str}, sep=',')  
+    data_source = pd.read_csv('inputfiles/petersengraph_newbigweights.csv', dtype ={'source': str, 'target':str}, sep=',')  
 
     
     if directed_flag:
@@ -728,7 +730,7 @@ if __name__ == "__main__":
     
     calculate_target_orc(target_distance_matrix, target_graph, verbose)
     update_orc_and_weights_iter(distance_matrix, source_graph, target_graph, iteration=0, verbose=verbose)
-    quit()
+    # quit()
     
     total_iterations = 100
     for i in range(1, total_iterations + 1):
