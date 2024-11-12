@@ -102,20 +102,23 @@ class Hypergraph:
         # Initialize a 2D list (matrix) with "infinite" distances
         dist = [[float('inf') for _ in range(node_count)] for _ in range(node_count)]
         
-        # Set the diagonal to 0 (distance from each node to itself)
+        # Set the diagonal to 0 (distance from each node to itself) 
+        # #TODO: See if this makes sense for directed
         for i in range(node_count):
             dist[i][i] = 0
         
         # Set the distance for directly connected nodes based on edge weights
         for hyperedge_id, nodes in self.hyperedges.items():
+            # print(hyperedge_id)
+            # print(nodes)
             if isinstance(self, UndirectedHypergraph):
                 tail_set, head_set = nodes, nodes
             else: 
                 tail_set, head_set = nodes
             
-            # set distances within tail set and head set to 0
             #TODO: test this when it comes to actual hypergraphs
             '''
+            # set distances within tail set and head set to 0
             for tail in tail_set:
                 for another_tail in tail_set:
                     if tail != another_tail:
@@ -130,6 +133,9 @@ class Hypergraph:
                 for head in head_set:
                     # Update the distance with the weight of the edge
                     # Assuming edge_id is used to access weights; adjust accordingly
+                    # print(node_index[tail], node_index[head])
+                    # print(dist[node_index[tail]][node_index[head]])
+                    # print(self.weights[hyperedge_id])
                     dist[node_index[tail]][node_index[head]] = min(dist[node_index[tail]][node_index[head]],self.weights[hyperedge_id][-1])  # Using the last weight in the list
         
         # Floyd-Warshall algorithm to update distances
@@ -138,19 +144,23 @@ class Hypergraph:
                 for j in self.nodes:
                     if dist[node_index[i]][node_index[k]] + dist[node_index[k]][node_index[j]] < dist[node_index[i]][node_index[j]]:
                         dist[node_index[i]][node_index[j]] = dist[node_index[i]][node_index[k]] + dist[node_index[k]][node_index[j]]
-
+        
         # Replace 'inf' with 0 for pairs of nodes that have no path between them
+        #TODO: Check if this is a good idea. I think this is odd, so will drop for now. Like probably? but also nodes have dist 0 to themselves
+        '''
         for i in range(node_count):
             for j in range(node_count):
                 if dist[i][j] == float('inf'):
                     dist[i][j] = 0 
+        '''
 
         return dist
         
         
     def calculate_degrees(self):
         '''
-        Return the max degree, min degree, and average degree values. For Directed, we're get (in, out) pairs
+        Return the max degree, min degree, and average degree values. 
+        For Directed, we get (in, out) pairs. Confirmed works on Directed
         '''
         degrees = []
         
@@ -278,7 +288,6 @@ class UndirectedHypergraph(Hypergraph):
         return neighbours
     
     def node_probability(self, node):
-        #TODO: Note this is wrong for directed graphs
         alpha = 0.1  # Self-transition probability factor
         probability_distribution = {n: 0.0 for n in self.nodes}  # Initialize probabilities
 
@@ -355,12 +364,11 @@ class UndirectedHypergraph(Hypergraph):
             print(f'mass for {node_A} is {total_mass_A} and mass for {node_B} is {total_mass_B}')
     
         if abs(total_mass_A - total_mass_B) > 1e-6:
-            # TODO: improve error message
-            raise ValueError('The total mass of the distributions mu_A and mu_B are not equal. For')
+            raise ValueError('The total mass of the distributions mu_A and mu_B are not equal.')
         
 
         # Create a mapping of nodes to their indices in the distance matrix.
-        node_to_index = {node: idx for idx, node in enumerate(list(self.nodes))}
+        node_to_index = self.node_index
 
         try:
             # Create a new model in Gurobi.
@@ -467,7 +475,7 @@ class DirectedHypergraph(Hypergraph):
                 self.add_node(node)
         
         self.hyperedges[hyperedge_id] = (tail_set, head_set)
-        self.weights[hyperedge_id]=[weight_list] # init the weight to 1
+        self.weights[hyperedge_id]= weight_list
         
     def add_missing_target_edges(self, targ_graph:Hypergraph):
         #TODO: check if this works for Digraphs
@@ -480,7 +488,7 @@ class DirectedHypergraph(Hypergraph):
         for _, row in df.iterrows():
             node1 = row['source'].strip() #start
             node2 = row['target'].strip() #end
-            weight = float(row['weight'].strip())
+            weight = float(row['weight'])
             edgeid = node1 + '_to_' + node2
             self.add_hyperedge(edgeid, set(node1), set(node2), [weight])
             if verbose:
@@ -517,6 +525,147 @@ class DirectedHypergraph(Hypergraph):
                 d_out_x += 1
         
         return [d_in_x, d_out_x]
+
+    
+    def calculate_probability_distributions(self, hyperedge_id):
+        #TODO: double check for correctness
+        '''Function to calculate the probability distributions over all nodes based on the hyperedge'''
+        tail_set, head_set = self.hyperedges[hyperedge_id]
+
+        # Initialize mu_A and mu_B only for nodes in the tail set and head set respectively
+       
+        mu_A_in = {node: 0 for node in self.nodes}
+        for node in tail_set:
+            d_x_in = self.node_degree(node)[0]
+            if d_x_in != 0:
+                mu_A_in[node] = 0
+            else:
+                mu_A_in[node] = 1 / len(tail_set)
+
+       
+        mu_B_out = {node: 0 for node in self.nodes}
+        for node in head_set:
+            d_x_out = self.node_degree(node)[1]
+            if d_x_out != 0:
+                mu_B_out[node] = 0
+            else:
+                mu_B_out[node] = 1 / len(head_set)
+        
+        # Third Case
+        for edge in self.hyperedges:
+            if edge != hyperedge_id:
+                tail_set_prime, head_set_prime = self.hyperedges[edge]
+                common_tail_nodes = set(tail_set) & set(head_set_prime)
+                if common_tail_nodes:
+                    for node in common_tail_nodes:
+                        deg_x_in = self.node_degree(node)[0]
+                        for nodes in tail_set_prime:
+                            if deg_x_in != 0:  
+                                mu_A_in[nodes] += 1 / (len(tail_set) * len(tail_set_prime) * deg_x_in)
+
+                common_head_nodes = set(head_set) & set(tail_set_prime)
+                if common_head_nodes:
+                    for node in common_head_nodes:
+                        deg_x_out = self.node_degree(node)[1]
+                        for nodes in head_set_prime:
+                            if deg_x_out != 0:    
+                                mu_B_out[nodes] += 1 / (len(head_set) * len(head_set_prime) * deg_x_out)
+              
+        total_mass_A = sum(mu_A_in.values())
+        total_mass_B = sum(mu_B_out.values())
+        
+        # Normalize the probability distributions
+        if total_mass_A == 0:
+            mu_A_in ={node: mass for node, mass in mu_A_in.items()}
+        else:
+            mu_A_in = {node: mass / total_mass_A for node, mass in mu_A_in.items()}
+        
+        if total_mass_B == 0:
+            mu_B_out = {node: mass for node, mass in mu_B_out.items()}
+        else:
+            mu_B_out = {node: mass / total_mass_B for node, mass in mu_B_out.items()}
+        
+        return mu_A_in, mu_B_out
+    
+    
+    def earthmover_distance_gurobi_distance_matrix(self, hyperedge_id, distance_matrix, verbose):
+        '''Function to calculate EMD using the distance matrix (Optimized)'''
+        #TODO: think of how to combine these for undirected//directed
+        # Get the probability distributions for the specified hyperedge.
+        mu_A, mu_B = self.calculate_probability_distributions(hyperedge_id)
+
+        # Convert distributions from dictionary to list format and print for debugging
+        nodes_A = sorted(mu_A.keys())
+        nodes_B = sorted(mu_B.keys())
+        distribution1 = [mu_A[node] for node in nodes_A]
+        distribution2 = [mu_B[node] for node in nodes_B]
+    
+        # Print the distributions to verify correctness
+        if verbose:
+            print("Nodes in mu_A:", nodes_A)
+            print("Nodes in mu_B:", nodes_B)
+            print("Distribution mu_A:", distribution1)
+            print("Distribution mu_B:", distribution2)
+
+        # Check if distributions sum to the same value
+        total_mass_A = sum(distribution1)
+        total_mass_B = sum(distribution2)
+        if verbose:
+            print("Total mass in mu_A:", total_mass_A)
+            print("Total mass in mu_B:", total_mass_B)
+    
+        if abs(total_mass_A - total_mass_B) > 1e-6:
+            raise ValueError('The total mass of the distributions mu_A and mu_B are not equal.')
+        
+
+        # Create a mapping of nodes to their indices in the distance matrix.
+        node_to_index = self.node_index
+
+        
+        try:
+            model = Model("EarthMoverDistance")
+
+            # Set up the log file
+            log_filename = f"gurobi_log_{hyperedge_id}.log"
+            model.setParam('LogFile', log_filename)
+
+            variables = model.addVars(mu_A.keys(), mu_B.keys(), name="z", lb=0)
+
+            # Update the objective function to use the distance matrix.
+            model.setObjective(quicksum(distance_matrix[node_to_index[x]][node_to_index[y]] * variables[x, y]
+                                for x in mu_A for y in mu_B), GRB.MINIMIZE)
+
+            # Add constraints
+            for x in mu_A:
+                model.addConstr(quicksum(variables[x, y] for y in mu_B) == mu_A[x], f"dirt_leaving_{x}")
+
+            for y in mu_B:
+                model.addConstr(quicksum(variables[x, y] for x in mu_A) == mu_B[y], f"dirt_filling_{y}")
+
+            start_time = time.time()
+            model.optimize()
+            end_time = time.time()
+
+            time_taken = end_time - start_time
+
+            if model.status == GRB.OPTIMAL:
+                total_cost = model.getObjective().getValue()
+                print("Total EMD Cost:", total_cost)
+                print("Time taken to find the optimal solution: {:.4f} seconds".format(time_taken))
+
+                for x in mu_A:
+                    for y in mu_B:
+                        amount_moved = variables[x, y].X
+                        if amount_moved > 0:
+                            print(f"Move {amount_moved} from {x} to {y}")
+                return total_cost
+            else:
+                print("No optimal solution found.")
+                return None
+            
+        except Exception as e:
+            print(f"Gurobi Error: {e}")
+            return None
     
     
     
@@ -587,7 +736,9 @@ def calculate_target_orc(distance_matrix: list[list], graph:Hypergraph, verbose,
         
         for hyperedge_id in graph.hyperedges:
             if isinstance(graph, UndirectedHypergraph):
-                orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose = False)
+                orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose)
+            else: # We're a directed graph
+                orc = 1.0
             # normalizing
             # normalized_orc = ricci_normalizing(orc)
             # un-normalizing
@@ -635,18 +786,6 @@ if __name__ == "__main__":
     # average absolute difference and see if that's small
     # try a network such that the sum of the two weights are the same
     '''
-    
-    1. don't normalize, then look through and see if its scale invariant, see if there's a multiplier
-    
-    2. Then normalize and then check for this c.
-    
-    If the ratios are basically the same, then it works
-    
-    but if the ratios at the end are different than the starting weights find a multiplier 
-    for what value of c is the distance between the weights might be the smallest
-    linear search
-     
-    update by Friday
     '''
     directed_flag = False
     verbose = True
@@ -666,10 +805,10 @@ if __name__ == "__main__":
     # data_source = pd.read_csv('inputfiles/ERgraph50nodesincr.csv', dtype ={'source': str, 'target':str}, sep=',')  
     # data_target = pd.read_csv('inputfiles/petersengraph.csv', dtype ={'source': str, 'target':str}, sep=',')  
     # data_source = pd.read_csv('inputfiles/petersengraph_bigedges.csv', dtype ={'source': str, 'target':str}, sep=',')  
+    data_source = pd.read_csv('inputfiles/petersengraph.csv', dtype ={'source': str, 'target':str}, sep=',')  
+    data_target = pd.read_csv('inputfiles/petersengraph_newweights.csv', dtype ={'source': str, 'target':str}, sep=',')  
     # data_target = pd.read_csv('inputfiles/petersengraph.csv', dtype ={'source': str, 'target':str}, sep=',')  
-    # data_source = pd.read_csv('inputfiles/petersengraph_newweights.csv', dtype ={'source': str, 'target':str}, sep=',')  
-    data_target = pd.read_csv('inputfiles/petersengraph.csv', dtype ={'source': str, 'target':str}, sep=',')  
-    data_source = pd.read_csv('inputfiles/petersengraph_newbigweights.csv', dtype ={'source': str, 'target':str}, sep=',')  
+    # data_source = pd.read_csv('inputfiles/petersengraph_newbigweights.csv', dtype ={'source': str, 'target':str}, sep=',')  
 
     
     if directed_flag:
@@ -696,7 +835,7 @@ if __name__ == "__main__":
         print('The actual edges with weights:', source_graph.weights)
         
         connected = source_graph.is_weakly_connected()
-        print("The hypergraph is weakly connected:" if connected else "The hypergraph is not weakly connected.")
+        print("The hypergraph is weakly connected." if connected else "The hypergraph is not weakly connected.")
         
         max_degree, min_degree, avg_degree = source_graph.calculate_degrees()
         print(f"Max Degree: {max_degree}")
@@ -714,9 +853,11 @@ if __name__ == "__main__":
     print('working on distance matrices')
     distance_matrix = source_graph.floyd_warshall()
     save_matrix_csv(distance_matrix, 'outputfiles/undirected_source_dist_fw.csv')
-    
+   
     target_distance_matrix = target_graph.floyd_warshall()
     save_matrix_csv(target_distance_matrix, 'outputfiles/undirected_target_dist_fw.csv')
+    print(source_graph.node_index)
+    print(target_graph.node_index)
     
     # TODO: Check this works (not testing it right now)
     if set(target_graph.hyperedges) != set(source_graph.hyperedges):
@@ -730,7 +871,7 @@ if __name__ == "__main__":
     
     calculate_target_orc(target_distance_matrix, target_graph, verbose)
     update_orc_and_weights_iter(distance_matrix, source_graph, target_graph, iteration=0, verbose=verbose)
-    # quit()
+    quit()
     
     total_iterations = 100
     for i in range(1, total_iterations + 1):
