@@ -377,17 +377,17 @@ class UndirectedHypergraph(Hypergraph):
             # Set up the log file
             #log_filename = f"gurobi_log_{hyperedge_id}.log"
             # Set up the log file
-            '''
-            log_filename = f"gurobi_log_{hyperedge_id}.log"
-            model.setParam('LogFile', log_filename)
-            '''
+            # '''
+            # log_filename = f"gurobi_log_{hyperedge_id}.log"
+            # model.setParam('LogFile', log_filename)
+            # '''
             #model.setParam('OutputFlag', 1)
             # Create variables for the linear program.
             variables = model.addVars(mu_A.keys(), mu_B.keys(), name="z", lb=0)
             
             # Should make it less verbose
-            if not verbose:
-                model.Params.LogToConsole = 0
+            # if not verbose:
+            model.Params.LogToConsole = 0
 
             # Set the objective of the linear program to minimize the total cost.
             model.setObjective(quicksum(distance_matrix[node_to_index[x]][node_to_index[y]] * variables[x, y]
@@ -408,7 +408,6 @@ class UndirectedHypergraph(Hypergraph):
                 total_cost = model.getObjective().getValue()
                 return total_cost
             else:
-                #TODO: add more info for this error
                 print(f"No optimal solution found for nodes {node_A} and {node_B}")
                 print(f"The probability distributions are A: {mu_A} \nAnd B: {mu_B}")
                 print('Model Status', model.status)
@@ -442,7 +441,7 @@ class UndirectedHypergraph(Hypergraph):
         # Generate all combinations of pairs of nodes
         for node_A, node_B in combinations(nodes, 2):
             emd = self.earthmover_distance_gurobi_distance_matrix(node_A, node_B, distance_matrix, verbose)
-            print(f'emd is {emd} on nodes {node_A} and {node_B}')
+            # print(f'emd is {emd} on nodes {node_A} and {node_B}')
             
             if emd is not None:
                 sum_emd += emd
@@ -590,7 +589,8 @@ class DirectedHypergraph(Hypergraph):
     
     def earthmover_distance_gurobi_distance_matrix(self, hyperedge_id, distance_matrix, verbose):
         '''Function to calculate EMD using the distance matrix (Optimized)'''
-        #TODO: think of how to combine these for undirected//directed
+        #TODO: think of how to combine these for undirected//directed. Most of this is the exact same.
+        # seems directed does the combinations in the calculate probability distributions section
         # Get the probability distributions for the specified hyperedge.
         mu_A, mu_B = self.calculate_probability_distributions(hyperedge_id)
 
@@ -620,16 +620,19 @@ class DirectedHypergraph(Hypergraph):
 
         # Create a mapping of nodes to their indices in the distance matrix.
         node_to_index = self.node_index
-
         
         try:
             model = Model("EarthMoverDistance")
 
             # Set up the log file
-            log_filename = f"gurobi_log_{hyperedge_id}.log"
-            model.setParam('LogFile', log_filename)
+            # log_filename = f"gurobi_log_{hyperedge_id}.log"
+            # model.setParam('LogFile', log_filename)
 
             variables = model.addVars(mu_A.keys(), mu_B.keys(), name="z", lb=0)
+            
+            # Should make it less verbose
+            if not verbose:
+                model.Params.LogToConsole = 0
 
             # Update the objective function to use the distance matrix.
             model.setObjective(quicksum(distance_matrix[node_to_index[x]][node_to_index[y]] * variables[x, y]
@@ -642,16 +645,16 @@ class DirectedHypergraph(Hypergraph):
             for y in mu_B:
                 model.addConstr(quicksum(variables[x, y] for x in mu_A) == mu_B[y], f"dirt_filling_{y}")
 
-            start_time = time.time()
+            # start_time = time.time()
             model.optimize()
-            end_time = time.time()
+            # end_time = time.time()
 
-            time_taken = end_time - start_time
+            # time_taken = end_time - start_time
 
             if model.status == GRB.OPTIMAL:
                 total_cost = model.getObjective().getValue()
                 print("Total EMD Cost:", total_cost)
-                print("Time taken to find the optimal solution: {:.4f} seconds".format(time_taken))
+                # print("Time taken to find the optimal solution: {:.4f} seconds".format(time_taken))
 
                 for x in mu_A:
                     for y in mu_B:
@@ -660,11 +663,14 @@ class DirectedHypergraph(Hypergraph):
                             print(f"Move {amount_moved} from {x} to {y}")
                 return total_cost
             else:
-                print("No optimal solution found.")
+                print(f"No optimal solution found for nodes {nodes_A} and {nodes_B}")
+                print(f"The probability distributions are A: {mu_A} \nAnd B: {mu_B}")
+                print('Model Status', model.status)
+                print(f"The masses are {total_mass_A} for A and {total_mass_B} for B")
                 return None
             
         except Exception as e:
-            print(f"Gurobi Error: {e}")
+            print(f"Gurobi Error: {e}\n for hyperedge {hyperedge_id}")
             return None
     
     
@@ -692,13 +698,13 @@ def update_orc_and_weights_iter(distance_matrix:list[list], graph:Hypergraph, ta
                 if isinstance(graph, UndirectedHypergraph):
                     orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose=False)
                 # quit()
-                if iteration ==2:
-                    print(hyperedge_id, orc)
+                # if iteration ==2:
+                    # print(hyperedge_id, orc)
                     # quit()
                 # Normalize the curvature
-                # normalized_orc = ricci_normalizing(orc)
+                normalized_orc = ricci_normalizing(orc)
                 # un-normalizing
-                normalized_orc = orc
+                # normalized_orc = orc
                 # add the value to our graph
                 graph.add_ricci_curvature(hyperedge_id, normalized_orc)
                 # grab the latest weight the weights
@@ -709,7 +715,9 @@ def update_orc_and_weights_iter(distance_matrix:list[list], graph:Hypergraph, ta
                     orc_targ = targ_graph.ricci_curvature[hyperedge_id][-1]
                     
                     if weight != 0:
-                        wtplus1 = weight*((1 + (alpha * beta)/4) - (alpha/4)*(normalized_orc - orc_targ + beta))
+                        # wtplus1 = weight*((1 + (alpha * beta)/4) - (alpha/4)*(normalized_orc - orc_targ + beta))
+                        #simple version
+                        wtplus1 = weight*(1  - (normalized_orc - orc_targ))
                         # normalized_weight = adjusted_sigmoid_0_to_1(wtplus1)
                         normalized_weight = wtplus1
                     else:
@@ -740,9 +748,9 @@ def calculate_target_orc(distance_matrix: list[list], graph:Hypergraph, verbose,
             else: # We're a directed graph
                 orc = 1.0
             # normalizing
-            # normalized_orc = ricci_normalizing(orc)
+            normalized_orc = ricci_normalizing(orc)
             # un-normalizing
-            normalized_orc = orc
+            # normalized_orc = orc
             # print('hyperedge:', hyperedge_id, 'orc: ', orc, 'normalized orc: ', normalized_orc)
             graph.add_ricci_curvature(hyperedge_id, normalized_orc)
             weight = graph.weights[hyperedge_id][-1]
@@ -757,8 +765,13 @@ def adjusted_sigmoid_0_to_1(x):
     a, b = -1, 1  # Define the target range
     return a + (b - a) / (1 + np.exp(-x_clipped))
 
-def ricci_normalizing(x):
-    return ((1 - np.exp(-x))/(1+ np.exp(-x)))
+def ricci_normalizing(R: float):
+    '''
+    Using the normalization function sigma(R)/sigma(1) 
+    Where sigma(x) is the standard sigmoid function 1/(1+\exp(-x))
+    :param R: the ORC value to be normalized 
+    '''
+    return ((1 - np.exp(-1))/(1+ np.exp(-R)))
 
 
 def clean_output(verbose):
@@ -788,7 +801,7 @@ if __name__ == "__main__":
     '''
     '''
     directed_flag = False
-    verbose = True
+    verbose = False
     
     clean_output(verbose)
     
@@ -799,16 +812,19 @@ if __name__ == "__main__":
     The data needs to come in as a csv with three columns labeled 'source', 'target', and 'weight'
     This will be read as a pandas dataframe. 
     And the nodes must be labeled the same in both graphs for this to work
+    
+    # TODO: Change the weight of 5 edges, the 100 edges, and 1000 edges for 10 different pairs. For 100 node graphs
+    # TODO: Also check out the directed graphs
     '''
     
     # data_target = pd.read_csv('inputfiles/ERgraph50nodesweight1.csv', dtype ={'source': str, 'target':str}, sep=',')  
     # data_source = pd.read_csv('inputfiles/ERgraph50nodesincr.csv', dtype ={'source': str, 'target':str}, sep=',')  
     # data_target = pd.read_csv('inputfiles/petersengraph.csv', dtype ={'source': str, 'target':str}, sep=',')  
     # data_source = pd.read_csv('inputfiles/petersengraph_bigedges.csv', dtype ={'source': str, 'target':str}, sep=',')  
-    data_source = pd.read_csv('inputfiles/petersengraph.csv', dtype ={'source': str, 'target':str}, sep=',')  
-    data_target = pd.read_csv('inputfiles/petersengraph_newweights.csv', dtype ={'source': str, 'target':str}, sep=',')  
-    # data_target = pd.read_csv('inputfiles/petersengraph.csv', dtype ={'source': str, 'target':str}, sep=',')  
-    # data_source = pd.read_csv('inputfiles/petersengraph_newbigweights.csv', dtype ={'source': str, 'target':str}, sep=',')  
+    # data_source = pd.read_csv('inputfiles/petersengraph.csv', dtype ={'source': str, 'target':str}, sep=',')  
+    # data_target = pd.read_csv('inputfiles/petersengraph_newweights.csv', dtype ={'source': str, 'target':str}, sep=',')  
+    data_target = pd.read_csv('inputfiles/petersengraph.csv', dtype ={'source': str, 'target':str}, sep=',')  
+    data_source = pd.read_csv('inputfiles/petersengraph_newbigweights.csv', dtype ={'source': str, 'target':str}, sep=',')  
 
     
     if directed_flag:
@@ -871,7 +887,7 @@ if __name__ == "__main__":
     
     calculate_target_orc(target_distance_matrix, target_graph, verbose)
     update_orc_and_weights_iter(distance_matrix, source_graph, target_graph, iteration=0, verbose=verbose)
-    quit()
+    # quit()
     
     total_iterations = 100
     for i in range(1, total_iterations + 1):
@@ -883,6 +899,7 @@ if __name__ == "__main__":
         finustab = None
         for e in source_graph.hyperedges:
             wlist = source_graph.weights[e]
+            # TODO: converge based on curvature and not weight
             old = wlist[-2]
             new = wlist[-1]
             # print(e, old, new)
@@ -954,7 +971,7 @@ if __name__ == "__main__":
                 allstable = False
                 break
         if allstable:
-            print('STABILIZED! Source to target distance is ',i)
+            print('STABILIZED! Target to source distance is ',i)
             break
             
     if not allstable:
