@@ -47,17 +47,9 @@ class Hypergraph:
             self.weights[hyperedge_id].append(weights)
     
     def update_node_index(self) -> None:
+        '''The goal is to ensure there is a static node index for the graph. This function generates it
+        '''
         self.node_index = {node: idx for idx, node in enumerate(list(self.nodes))}
-            
-    def normalize_weights(self) -> None:
-        ''' Normalize the weights of the edges as suggested in the proposal (divide by the total weight)'''
-        all_weights = [self.weights[e][-1] for e in self.weights.keys() if self.weights[e][-1] != np.inf]
-        tot_weight = sum(all_weights)
-        # print(tot_weight)
-        for edge_id in self.hyperedges.keys():
-            recent_w = self.weights[edge_id][-1]
-            new_w = recent_w/tot_weight
-            self.add_weights(edge_id, new_w)
             
     def is_2_uniform(self) -> bool:
         # need to check size of each edge is 2
@@ -884,14 +876,6 @@ if __name__ == "__main__":
         print(f"Average Degree: {avg_degree}")
         
     #TODO: rewrite the following as a little function we can send things to
-
-    # Normalize the edge weights. Doing so as suggested in the proposal (basically divide the weights by total weight (excluding inf))
-    # print('Normalizing the weights')
-    # source_graph.normalize_weights()
-    # target_graph.normalize_weights()
-    # if verbose:
-    #     print(source_graph.weights)
-    #     print(target_graph.weights)
     
     print('working on distance matrices')
     distance_matrix = source_graph.floyd_warshall()
@@ -964,9 +948,6 @@ if __name__ == "__main__":
     source_graph.build_from_dataframe(data_target, verbose)
     print('building target')
     target_graph.build_from_dataframe(data_source, verbose)
-        
-    # source_graph.normalize_weights()
-    # target_graph.normalize_weights()
         
     distance_matrix = source_graph.floyd_warshall()    
     target_distance_matrix = target_graph.floyd_warshall()
