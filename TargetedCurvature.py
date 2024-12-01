@@ -9,6 +9,7 @@ from itertools import combinations
 from gurobipy import Model, GRB, quicksum
 import time
 import os
+from numbers import Number
 
 class Hypergraph:
     def __init__(self):       
@@ -40,11 +41,15 @@ class Hypergraph:
         self.ricci_curvature[hyperedge_id].append(orc)
         return
         
-    def add_weights(self, hyperedge_id:str, weights) -> None:
-        '''Function to add weights for all hyperedges for every iteration.
-            Seems to be appending to a list.'''
-        if weights is not None:
-            self.weights[hyperedge_id].append(weights)
+    def add_weights(self, hyperedge_id:str, weight: Number) -> None:
+        '''Function to add weights for all hyperedges for each iteration.
+            It will be appending to a list
+
+        :param str hyperedge_id: the id of the hyperedge of interest
+        :param Number weights: a number for the weight
+        ''' 
+        if weight is not None:
+            self.weights[hyperedge_id].append(weight)
     
     def update_node_index(self) -> None:
         '''The goal is to ensure there is a static node index for the graph. This function generates it
@@ -52,8 +57,11 @@ class Hypergraph:
         self.node_index = {node: idx for idx, node in enumerate(list(self.nodes))}
             
     def is_2_uniform(self) -> bool:
-        # need to check size of each edge is 2
-        # find a way to do this quicker
+        '''Check if size of each edge is 2
+
+        :return bool: true if graph is 2 uniform
+        '''
+        # TODO: find a way to do this quicker
         for edges in self.hyperedges.items():
             if len(edges) != 2:
                 return False
@@ -61,7 +69,10 @@ class Hypergraph:
             
     def is_weakly_connected(self)-> bool:
         '''Check if the underlying graph is weakly connected
-        '''
+        # TODO: think if there is a quicker way other than DFS to do this
+
+        :return bool: True if weakly connected
+        '''        
         # I think this is saying an empty graph is weakly connected
         if not self.nodes: 
             return True
@@ -90,6 +101,13 @@ class Hypergraph:
   
     
     def floyd_warshall(self) -> list[list]:
+        '''Use the Floyd-Warshall algorithm to find the shortest distances between
+           each pair of vertices. Right now, if you cannot get from one node to another,
+           the distance will be 'inf'. This will be relavant in the case of directed, not strongly connected graphs.
+
+        :return list[list]: a matrix with the shortest distances
+        '''        
+    
         # Initialize the distance matrix with "infinite" distances
         # Assume self.nodes is a list or set of nodes
         node_list = list(self.nodes) # Convert to list to ensure consistent ordering
@@ -132,10 +150,6 @@ class Hypergraph:
             for tail in tail_set:
                 for head in head_set:
                     # Update the distance with the weight of the edge
-                    # Assuming edge_id is used to access weights; adjust accordingly
-                    # print(node_index[tail], node_index[head])
-                    # print(dist[node_index[tail]][node_index[head]])
-                    # print(self.weights[hyperedge_id])
                     dist[node_index[tail]][node_index[head]] = min(dist[node_index[tail]][node_index[head]],self.weights[hyperedge_id][-1])  # Using the last weight in the list
         
         # Floyd-Warshall algorithm to update distances
@@ -161,7 +175,9 @@ class Hypergraph:
         '''
         Return the max degree, min degree, and average degree values. 
         For Directed, we get (in, out) pairs. Confirmed works on Directed
-        '''
+
+        :return: max degree, min degree, and average degree 
+        '''  
         degrees = []
         
         # Iterate over each node in the hypergraph
