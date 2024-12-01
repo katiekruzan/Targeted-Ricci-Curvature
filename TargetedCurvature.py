@@ -200,8 +200,16 @@ class Hypergraph:
 
 
 class UndirectedHypergraph(Hypergraph):
-    def add_hyperedge(self, hyperedge_id:str, nodes:list, weight_list = [1], verbose=True):
-        """Add a hyperedge to the hypergraph. Automatically adds missing nodes."""
+    def add_hyperedge(self, hyperedge_id:str, nodes:list, weight_list = [1], verbose=True)-> None:
+        '''Add a hyperedge to the hypergraph. Automatically adds missing nodes.
+
+        :param str hyperedge_id: the name you would like to be used for the hyperedge
+        :param list nodes: a list of the adjacent nodes
+        :param list weight_list: Should start as a list with a single element (expect for odd cases), defaults to [1]
+        :param bool verbose: verbose flag, defaults to True
+        :raises ValueError: If the nodes is not a list, will raise this error
+        '''        
+        
         # Ensure nodes is a list
         if not isinstance(nodes, list):
             raise ValueError("Nodes must be provided as a list")
@@ -222,7 +230,14 @@ class UndirectedHypergraph(Hypergraph):
         self.weights[hyperedge_id] = weight_list #init the weights to [1]
         return
     
-    def add_missing_target_edges(self, targ_graph:Hypergraph, targ_dist_mat, verbose):
+    def add_missing_target_edges(self, targ_graph:Hypergraph, targ_dist_mat: list[list], verbose:bool)->None:
+        '''This will be used in the case where the target graph has edges this graph does not. We must add them.
+        Right now, initializing them to the shortest distance in the current graph.
+
+        :param Hypergraph targ_graph: The target graph
+        :param list[list] targ_dist_mat: the distance matrix of that graph from floyd warshall
+        :param bool verbose: verbose flag
+        '''
         for e in set(targ_graph.hyperedges) - set(self.hyperedges):
             # TODO: Change when getting to hypergraphs
             node1 = targ_graph.hyperedges[e][0]
@@ -230,13 +245,24 @@ class UndirectedHypergraph(Hypergraph):
             dist = targ_dist_mat[targ_graph.node_index[node1]][targ_graph.node_index[node2]]
             self.add_hyperedge(e, targ_graph.hyperedges[e], [dist], verbose)
             
-    def add_missing_source_edges(self, src_graph:Hypergraph, verbose):
+    def add_missing_source_edges(self, src_graph:Hypergraph, verbose:bool) -> None:
+        '''This will be used in the case where the source graph has edges this graph does not. We must add them.
+        Right now, initializing them to a weight of 0.
+        #TODO: check to see if this makes sense
+
+        :param Hypergraph src_graph: the source graph in question
+        :param bool verbose: the verbose flag
+        '''
         for e in set(src_graph.hyperedges) - set(self.hyperedges):
             self.add_hyperedge(e, src_graph.hyperedges[e], [0], verbose)
         
     
     def build_from_dataframe(self, df:pd.DataFrame, verbose=True):
-        '''Build hypergraph from a DataFrame'''
+        '''Build hypergraph from a DataFrame
+
+        :param pd.DataFrame df: has the columns 'source', 'target', and 'weight'
+        :param bool verbose: verbose flag, defaults to True
+        '''        
         # make an edge from each row in the csv
         #TODO: make this more general? Be able to catch errors
         for _, row in df.iterrows():
@@ -436,7 +462,7 @@ class UndirectedHypergraph(Hypergraph):
 
     
     
-    def earthmover_distance_hyperedge_combinations(self, hyperedge_id, distance_matrix, verbose):
+    def earthmover_distance_hyperedge_combinations(self, hyperedge_id:str, distance_matrix:list[list], verbose:bool):
         """
         This buddy gets the average EMD across the whole edge
         :param hyperedge_id: The identifier for the hyperedge.
