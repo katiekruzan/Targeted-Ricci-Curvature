@@ -817,14 +817,8 @@ if __name__ == "__main__":
     # TODO: Also check out the directed graphs
     '''
     
-    # data_target = pd.read_csv('inputfiles/ERgraph50nodesweight1.csv', dtype ={'source': str, 'target':str}, sep=',')  
-    # data_source = pd.read_csv('inputfiles/ERgraph50nodesincr.csv', dtype ={'source': str, 'target':str}, sep=',')  
-    # data_target = pd.read_csv('inputfiles/petersengraph.csv', dtype ={'source': str, 'target':str}, sep=',')  
-    # data_source = pd.read_csv('inputfiles/petersengraph_bigedges.csv', dtype ={'source': str, 'target':str}, sep=',')  
-    # data_source = pd.read_csv('inputfiles/petersengraph.csv', dtype ={'source': str, 'target':str}, sep=',')  
-    # data_target = pd.read_csv('inputfiles/petersengraph_newweights.csv', dtype ={'source': str, 'target':str}, sep=',')  
-    data_target = pd.read_csv('inputfiles/petersengraph.csv', dtype ={'source': str, 'target':str}, sep=',')  
-    data_source = pd.read_csv('inputfiles/petersengraph_newbigweights.csv', dtype ={'source': str, 'target':str}, sep=',')  
+    data_target = pd.read_csv('inputfiles/ERgraph100nodesweight1.csv', dtype ={'source': str, 'target':str}, sep=',')  
+    data_source = pd.read_csv('inputfiles/ERgraph100n5changev3.csv', dtype ={'source': str, 'target':str}, sep=',')  
 
     
     if directed_flag:
@@ -857,6 +851,8 @@ if __name__ == "__main__":
         print(f"Max Degree: {max_degree}")
         print(f"Min Degree: {min_degree}")
         print(f"Average Degree: {avg_degree}")
+        
+    #TODO: rewrite the following as a little function we can send things to
 
     # Normalize the edge weights. Doing so as suggested in the proposal (basically divide the weights by total weight (excluding inf))
     # print('Normalizing the weights')
@@ -897,11 +893,13 @@ if __name__ == "__main__":
         update_orc_and_weights_iter(distance_matrix_i, source_graph, target_graph, iteration=i, verbose=verbose)
         allstable = True
         finustab = None
+        if i == 1: # take care of the getting started case
+            continue
         for e in source_graph.hyperedges:
-            wlist = source_graph.weights[e]
+            clist = source_graph.ricci_curvature[e]
             # TODO: converge based on curvature and not weight
-            old = wlist[-2]
-            new = wlist[-1]
+            old = clist[-2]
+            new = clist[-1]
             # print(e, old, new)
             if old != 0:
                 error = abs((old-new)/old)
@@ -915,7 +913,7 @@ if __name__ == "__main__":
         if allstable:
             print('STABILIZED! Source to target distance is ',i)
             break
-            
+        
     if not allstable:
         # print(target_graph.weights)
         print(source_graph.weights[finustab])
@@ -958,10 +956,12 @@ if __name__ == "__main__":
         update_orc_and_weights_iter(distance_matrix_i, source_graph, target_graph, iteration=i, verbose=False, op_flag=True)
         allstable = True
         finustab = None
+        if i == 1: # take care of the getting started case
+            continue
         for e in source_graph.hyperedges:
-            wlist = source_graph.weights[e]
-            old = wlist[-2]
-            new = wlist[-1]
+            clist = source_graph.ricci_curvature[e]
+            old = clist[-2]
+            new = clist[-1]
             error = abs((old-new)/old) #error as a percentage of old
             # error = abs(old-new)
             if error > 0.01:
