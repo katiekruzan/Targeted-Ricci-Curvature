@@ -11,22 +11,30 @@ import time
 import os
 
 class Hypergraph:
-    def __init__(self):
-            '''Initializing the hypergraph'''
-            self.nodes = set() # arbitrary, not defined type as of now.
-            self.hyperedges = {} #dict from hyperedge id to lists of nodes in that edge
-            self.weights = {} # dict that had hyperedge ids to weights
-            self.ricci_curvature = {} #dict with hyperedge id to list of ricci curvatures
-            self.node_index = {}
+    def __init__(self):       
+        '''Initializing the hypergraph
+        '''
+        self.nodes = set() # arbitrary, not defined type as of now.
+        self.hyperedges = {} #dict from hyperedge id to lists of nodes in that edge
+        self.weights = {} # dict that had hyperedge ids to weights
+        self.ricci_curvature = {} #dict with hyperedge id to list of ricci curvatures (floats)
+        self.node_index = {}
             
     def add_node(self, node:any) -> None:
-        '''Function to add a node to the hypergraph. The type is not set'''
+        '''Function to add a node to the hypergraph. The type is not set
+
+        :param any node: The node to be added
+        '''      
         self.nodes.add(node)
         return
     
-    def add_ricci_curvature(self, hyperedge_id:str, orc)-> None:
-        '''Function to add ollivier ricci curvature for all hyperedges for every iteration.
-            Seems to be appending onto a list.'''
+    def add_ricci_curvature(self, hyperedge_id:str, orc:float)-> None:
+        '''Function to add ollivier ricci curvature for all hyperedges for each iteration.
+            It will be appending to a list
+
+        :param str hyperedge_id: The id of the hyperedge of interest
+        :param float orc: the curvature to be appended
+        '''        
         if hyperedge_id not in self.ricci_curvature:
             self.ricci_curvature[hyperedge_id] = []  # Initialize with an empty list if key doesn't exist
         self.ricci_curvature[hyperedge_id].append(orc)
@@ -671,16 +679,30 @@ class DirectedHypergraph(Hypergraph):
             
         except Exception as e:
             print(f"Gurobi Error: {e}\n for hyperedge {hyperedge_id}")
-            return None
+            return None    
     
     
-    
-def save_matrix_csv(matrix, filename:str) -> None:
-    '''Function to save the matrix as a CSV file'''    
+def save_matrix_csv(matrix:list[list], filename:str) -> None:
+    '''Function to save the matrix as a CSV file
+
+    :param list[list] matrix: matrix to be written
+    :param str filename: place to write it
+    '''    
     pd.DataFrame(matrix).to_csv(filename, index=False, header=False)
 
 
-def update_orc_and_weights_iter(distance_matrix:list[list], graph:Hypergraph, targ_graph:Hypergraph,  iteration:int, verbose, file_format='csv', op_flag = False):
+def update_orc_and_weights_iter(distance_matrix:list[list], graph:Hypergraph, targ_graph:Hypergraph,  iteration:int, verbose:bool, file_format='csv', op_flag = False):
+    '''The main function of this whole sheboodle. Run the whole process for the given itteration
+
+    :param list[list] distance_matrix: matrix of minimal distances from the floyd_warshall function
+    :param Hypergraph graph: the source graph we're looking at (or at least its current itteration)
+    :param Hypergraph targ_graph: the target graph we're headed to
+    :param int iteration: the round we're on
+    :param bool verbose: verbose flag
+    :param str file_format: defaults to 'csv'
+    :param bool op_flag: option to mark the file as 'op' (used in second half of
+                         script), defaults to False
+    '''
     if op_flag:
         file_name = f'outputfiles/op_dataset_targeted_curvature_iteration_{iteration}.{file_format}'
     else:
@@ -697,10 +719,6 @@ def update_orc_and_weights_iter(distance_matrix:list[list], graph:Hypergraph, ta
                 # TODO: Figure out the difference in Directed//Undirected
                 if isinstance(graph, UndirectedHypergraph):
                     orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose=False)
-                # quit()
-                # if iteration ==2:
-                    # print(hyperedge_id, orc)
-                    # quit()
                 # Normalize the curvature
                 normalized_orc = ricci_normalizing(orc)
                 # un-normalizing
@@ -710,15 +728,11 @@ def update_orc_and_weights_iter(distance_matrix:list[list], graph:Hypergraph, ta
                 # grab the latest weight the weights
                 weight = graph.weights[hyperedge_id][-1]
                 if iteration != 0:
-                    alpha = 1
-                    beta = 0
                     orc_targ = targ_graph.ricci_curvature[hyperedge_id][-1]
                     
                     if weight != 0:
-                        # wtplus1 = weight*((1 + (alpha * beta)/4) - (alpha/4)*(normalized_orc - orc_targ + beta))
                         #simple version
                         wtplus1 = weight*(1  - (normalized_orc - orc_targ))
-                        # normalized_weight = adjusted_sigmoid_0_to_1(wtplus1)
                         normalized_weight = wtplus1
                     else:
                         normalized_weight = 0
@@ -730,7 +744,16 @@ def update_orc_and_weights_iter(distance_matrix:list[list], graph:Hypergraph, ta
                     writer.writerow([hyperedge_id, normalized_orc, weight])
  
  
-def calculate_target_orc(distance_matrix: list[list], graph:Hypergraph, verbose, file_format='csv', op_flag=False):
+def calculate_target_orc(distance_matrix: list[list], graph:Hypergraph, verbose:bool, file_format='csv', op_flag=False):
+    '''The function to calculate the staring infor for the target graph
+
+    :param list[list] distance_matrix: matrix of minimal distances from the floyd_warshall function
+    :param Hypergraph graph: the actual source graph
+    :param bool verbose: verbose flag
+    :param str file_format: defaults to 'csv'
+    :param bool op_flag: option to mark the file as 'op' (used in second half of
+                         script), defaults to False
+    '''
     if op_flag:
         file_name = f'outputfiles/op_dataset_target_graph_orc.{file_format}'
     else:
@@ -751,19 +774,10 @@ def calculate_target_orc(distance_matrix: list[list], graph:Hypergraph, verbose,
             normalized_orc = ricci_normalizing(orc)
             # un-normalizing
             # normalized_orc = orc
-            # print('hyperedge:', hyperedge_id, 'orc: ', orc, 'normalized orc: ', normalized_orc)
             graph.add_ricci_curvature(hyperedge_id, normalized_orc)
             weight = graph.weights[hyperedge_id][-1]
             writer.writerow([hyperedge_id, normalized_orc, weight])  
     return
-             
-               
-# def adjusted_sigmoid_0_to_1(x):
-#     # Clip x to a range that prevents overflow in exp.
-#     # The range of -709 to 709 is chosen based on the practical limits of np.exp()
-#     x_clipped = np.clip(x, -709, 709)
-#     a, b = -1, 1  # Define the target range
-#     return a + (b - a) / (1 + np.exp(-x_clipped))
 
 
 def ricci_normalizing(R: float)->float: 
