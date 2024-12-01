@@ -758,23 +758,30 @@ def calculate_target_orc(distance_matrix: list[list], graph:Hypergraph, verbose,
     return
              
                
-def adjusted_sigmoid_0_to_1(x):
-    # Clip x to a range that prevents overflow in exp.
-    # The range of -709 to 709 is chosen based on the practical limits of np.exp()
-    x_clipped = np.clip(x, -709, 709)
-    a, b = -1, 1  # Define the target range
-    return a + (b - a) / (1 + np.exp(-x_clipped))
+# def adjusted_sigmoid_0_to_1(x):
+#     # Clip x to a range that prevents overflow in exp.
+#     # The range of -709 to 709 is chosen based on the practical limits of np.exp()
+#     x_clipped = np.clip(x, -709, 709)
+#     a, b = -1, 1  # Define the target range
+#     return a + (b - a) / (1 + np.exp(-x_clipped))
 
-def ricci_normalizing(R: float):
+
+def ricci_normalizing(R: float)->float: 
     '''
     Using the normalization function sigma(R)/sigma(1) 
     Where sigma(x) is the standard sigmoid function 1/(1+\exp(-x))
-    :param R: the ORC value to be normalized 
-    '''
+
+    :param float R: the ORC value to be normalized 
+    :return float: The normalized ORC value
+    ''' 
     return ((1 - np.exp(-1))/(1+ np.exp(-R)))
 
 
-def clean_output(verbose):
+def clean_output(verbose:bool) -> None:
+    '''puts all the files (other than the README) in the outputfiles/ folder into a subfolder
+
+    :param bool verbose: Can turn on to print the file names it has moved.
+    '''
     files = os.listdir('outputfiles')
     now = time.time()
     if not os.path.isdir(f'outputfiles/{now}'):
@@ -790,7 +797,15 @@ def clean_output(verbose):
             except:
                 print(f'Had issues moving {f} to a new folder')
     return
-    
+
+def write_scorecard(line:str)-> None:
+    '''function used to write the key results to a scorecard (for posterity)
+
+    :param str line: text to be put onto the scorecard
+    '''    
+    with open('outputfiles/scorecard.txt', 'a+') as f:
+        f.write(line)
+        f.write('\n')
     
   
 if __name__ == "__main__": 
@@ -812,6 +827,8 @@ if __name__ == "__main__":
     The data needs to come in as a csv with three columns labeled 'source', 'target', and 'weight'
     This will be read as a pandas dataframe. 
     And the nodes must be labeled the same in both graphs for this to work
+    
+    #TODO: make a little scorecard
     
     # TODO: Change the weight of 5 edges, the 100 edges, and 1000 edges for 10 different pairs. For 100 node graphs
     # TODO: Also check out the directed graphs
