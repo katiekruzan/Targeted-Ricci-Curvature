@@ -473,7 +473,6 @@ class UndirectedHypergraph(Hypergraph):
             return None
         
         nodes = self.hyperedges[hyperedge_id]
-        # print(nodes)
 
         if len(nodes) < 2:
             return 1
@@ -483,7 +482,6 @@ class UndirectedHypergraph(Hypergraph):
         # Generate all combinations of pairs of nodes
         for node_A, node_B in combinations(nodes, 2):
             emd = self.earthmover_distance_gurobi_distance_matrix(node_A, node_B, distance_matrix, verbose)
-            # print(f'emd is {emd} on nodes {node_A} and {node_B}')
             
             if emd is not None:
                 sum_emd += emd
@@ -496,14 +494,14 @@ class UndirectedHypergraph(Hypergraph):
             average_emd = sum_emd /pair_count
             weight = self.weights[hyperedge_id][-1]
             if weight == 0:
-                # this is the orc #TODO: check to see if this makes sense for weight =0 in a real way
+                # this is the orc 
+                # #TODO: check to see if this makes sense for weight =0 in a real way
                 return 1 - average_emd
             else:
                 # this is the orc. This is the EMD/dist(u,v) and dist(u,v) will just be the weight of the edge
                 return 1 - average_emd/weight
         else:
-            print(f"No valid EMD computations were possible. For hyperedge {hyperedge_id}")
-            print(emd)
+            print(f"No valid EMD computations were possible. For hyperedge {hyperedge_id} with EMD {emd}")
             return None
     
   
@@ -876,15 +874,22 @@ if __name__ == "__main__":
     This will be read as a pandas dataframe. 
     And the nodes must be labeled the same in both graphs for this to work
     
-    #TODO: make a little scorecard
+    # TODO: make a little scorecard
     
     # TODO: Change the weight of 5 edges, the 100 edges, and 1000 edges for 10 different pairs. For 100 node graphs
     # TODO: Also check out the directed graphs
     '''
     
-    data_target = pd.read_csv('inputfiles/ERgraph100nodesweight1.csv', dtype ={'source': str, 'target':str}, sep=',')  
-    data_source = pd.read_csv('inputfiles/ERgraph100n5changev3.csv', dtype ={'source': str, 'target':str}, sep=',')  
+    target_filename = 'ERgraph50nodesweight1.csv'
+    source_filename = 'ERgraph50n5changev4.csv'
+    
+    data_target = pd.read_csv(f'inputfiles/{target_filename}', dtype ={'source': str, 'target':str}, sep=',')  
+    data_source = pd.read_csv(f'inputfiles/{source_filename}', dtype ={'source': str, 'target':str}, sep=',')  
 
+    # Scorecard Writing
+    write_scorecard('----- Targeted Ricci Curvature -----')
+    write_scorecard(f'target filename: {target_filename}')
+    write_scorecard(f'source filename: {source_filename}')
     
     if directed_flag:
         source_graph = DirectedHypergraph()
@@ -902,6 +907,9 @@ if __name__ == "__main__":
         print('This has not been fully fleshed out for hypergraphs. Please give a 2-uniform graph')
         quit()
          
+    connected = source_graph.is_weakly_connected()
+    max_degree, min_degree, avg_degree = source_graph.calculate_degrees()
+    
     if verbose:
         print('type of graph', type(source_graph))
         print("Number of edges:",len(source_graph.hyperedges)) #Printing the number of (hyper)edges in our network.
@@ -909,14 +917,22 @@ if __name__ == "__main__":
         print('The actual nodes:', source_graph.nodes)
         print('The actual edges with weights:', source_graph.weights)
         
-        connected = source_graph.is_weakly_connected()
         print("The hypergraph is weakly connected." if connected else "The hypergraph is not weakly connected.")
         
-        max_degree, min_degree, avg_degree = source_graph.calculate_degrees()
         print(f"Max Degree: {max_degree}")
         print(f"Min Degree: {min_degree}")
         print(f"Average Degree: {avg_degree}")
-        
+    
+    write_scorecard('----- Graph Statistics -----')
+    write_scorecard(f'Type of Graph: {type(source_graph)}')
+    write_scorecard(f'Number of edges: {len(source_graph.hyperedges)}')
+    write_scorecard(f'Number of nodes: {len(source_graph.nodes)}')
+    if connected: write_scorecard('The hypergraph is weakly connected.')
+    else: write_scorecard('The hypergraph is not weakly connected.')
+    write_scorecard(f"Max Degree: {max_degree}")
+    write_scorecard(f"Min Degree: {min_degree}")
+    write_scorecard(f"Average Degree: {avg_degree}")
+    
     #TODO: rewrite the following as a little function we can send things to
     
     print('working on distance matrices')
@@ -969,10 +985,13 @@ if __name__ == "__main__":
                 break
         if allstable:
             print('STABILIZED! Source to target distance is ',i)
+            write_scorecard('----- Results -----')
+            write_scorecard(f'Source to target distance is {i}')
             break
         
     if not allstable:
         # print(target_graph.weights)
+        write_scorecard('Source to target did not stablize.')
         print(source_graph.weights[finustab])
     
     # quit()
@@ -1026,9 +1045,11 @@ if __name__ == "__main__":
                 break
         if allstable:
             print('STABILIZED! Target to source distance is ',i)
+            write_scorecard(f'Target to source distance is {i}')
             break
             
     if not allstable:
         # print(target_graph.weights)
+        write_scorecard('Target to source did not stablize.')
         print(source_graph.weights[finustab])
     
