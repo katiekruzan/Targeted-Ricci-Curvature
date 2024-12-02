@@ -874,8 +874,6 @@ if __name__ == "__main__":
     This will be read as a pandas dataframe. 
     And the nodes must be labeled the same in both graphs for this to work
     
-    # TODO: make a little scorecard
-    
     # TODO: Change the weight of 5 edges, the 100 edges, and 1000 edges for 10 different pairs. For 100 node graphs
     # TODO: Also check out the directed graphs
     '''
@@ -970,7 +968,6 @@ if __name__ == "__main__":
             continue
         for e in source_graph.hyperedges:
             clist = source_graph.ricci_curvature[e]
-            # TODO: converge based on curvature and not weight
             old = clist[-2]
             new = clist[-1]
             # print(e, old, new)
