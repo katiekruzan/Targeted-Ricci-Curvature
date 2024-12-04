@@ -11,6 +11,8 @@ import time
 import os
 from numbers import Number
 
+now = time.time()
+
 class Hypergraph:
     def __init__(self):       
         '''Initializing the hypergraph
@@ -752,6 +754,9 @@ def update_orc_and_weights_iter(distance_matrix:list[list], graph:Hypergraph, ta
                 if isinstance(graph, UndirectedHypergraph):
                     orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose=False)
                 # Normalize the curvature
+                now = time.time()
+                rt = now-start
+                write_scorecard(f'\tTime to calculate ORC for hyperedge {hyperedge_id}: {rt}')
                 normalized_orc = ricci_normalizing(orc)
                 # un-normalizing
                 # normalized_orc = orc
@@ -877,7 +882,7 @@ if __name__ == "__main__":
     # TODO: Change the weight of 5 edges, the 100 edges, and 1000 edges for 10 different pairs. For 100 node graphs
     # TODO: Also check out the directed graphs
     '''
-    
+    start = time.time()
     target_filename = 'ERgraph50nodesweight1.csv'
     source_filename = 'ERgraph50n5changev4.csv'
     
@@ -888,6 +893,9 @@ if __name__ == "__main__":
     write_scorecard('----- Targeted Ricci Curvature -----')
     write_scorecard(f'target filename: {target_filename}')
     write_scorecard(f'source filename: {source_filename}')
+    now = time.time()
+    rt = now-start
+    write_scorecard(f'Time to read the data in seconds: {rt}')
     
     if directed_flag:
         source_graph = DirectedHypergraph()
@@ -900,6 +908,9 @@ if __name__ == "__main__":
     source_graph.build_from_dataframe(data_source, verbose)
     print('building target')
     target_graph.build_from_dataframe(data_target, verbose)
+    now = time.time()
+    rt = now-start
+    write_scorecard(f'Time to build the graphs: {rt}')
     
     if not (source_graph.is_2_uniform() and target_graph.is_2_uniform()) :
         print('This has not been fully fleshed out for hypergraphs. Please give a 2-uniform graph')
@@ -930,17 +941,27 @@ if __name__ == "__main__":
     write_scorecard(f"Max Degree: {max_degree}")
     write_scorecard(f"Min Degree: {min_degree}")
     write_scorecard(f"Average Degree: {avg_degree}")
+    now = time.time()
+    rt = now-start
+    write_scorecard(f'Time to analyze graphs: {rt}')
     
     #TODO: rewrite the following as a little function we can send things to
     
     print('working on distance matrices')
     distance_matrix = source_graph.floyd_warshall()
     save_matrix_csv(distance_matrix, 'outputfiles/undirected_source_dist_fw.csv')
+    
+    now = time.time()
+    rt = now-start
+    write_scorecard(f'Time to make the source distance matrix: {rt}')
    
     target_distance_matrix = target_graph.floyd_warshall()
     save_matrix_csv(target_distance_matrix, 'outputfiles/undirected_target_dist_fw.csv')
-    print(source_graph.node_index)
-    print(target_graph.node_index)
+    
+    
+    now = time.time()
+    rt = now-start
+    write_scorecard(f'Time to make the target distance matrices: {rt}')
     
     # TODO: Check this works (not testing it right now)
     if set(target_graph.hyperedges) != set(source_graph.hyperedges):
@@ -953,7 +974,15 @@ if __name__ == "__main__":
     # Maybe just check that all the nodes are labeled the same.
     
     calculate_target_orc(target_distance_matrix, target_graph, verbose)
+    
+    now = time.time()
+    rt = now-start
+    write_scorecard(f'Time to calc target ORC: {rt}')
     update_orc_and_weights_iter(distance_matrix, source_graph, target_graph, iteration=0, verbose=verbose)
+    
+    now = time.time()
+    rt = now-start
+    write_scorecard(f'Time to calc source ORC: {rt}')
     # quit()
     
     total_iterations = 100
@@ -961,7 +990,15 @@ if __name__ == "__main__":
         print('Working on itteration', i)
         distance_matrix_i = source_graph.floyd_warshall()
         save_matrix_csv(distance_matrix_i, f'outputfiles/distance_matrix_source_itteration_{i}.csv')
+        
+        now = time.time()
+        rt = now-start
+        write_scorecard(f'Time for distance matrix {i}: {rt}')
         update_orc_and_weights_iter(distance_matrix_i, source_graph, target_graph, iteration=i, verbose=verbose)
+        now = time.time()
+        rt = now-start
+        write_scorecard(f'Time for ORC {i}: {rt}')
+        
         allstable = True
         finustab = None
         if i == 1: # take care of the getting started case
@@ -982,7 +1019,7 @@ if __name__ == "__main__":
                 break
         if allstable:
             print('STABILIZED! Source to target distance is ',i)
-            write_scorecard('----- Results -----')
+            write_scorecard('\n\n----- Results -----')
             write_scorecard(f'Source to target distance is {i}')
             break
         
@@ -990,6 +1027,10 @@ if __name__ == "__main__":
         # print(target_graph.weights)
         write_scorecard('Source to target did not stablize.')
         print(source_graph.weights[finustab])
+        
+    now = time.time()
+    rt = now-start
+    write_scorecard(f'Time for source->target: {rt}')
     
     # quit()
     # Go the other way
