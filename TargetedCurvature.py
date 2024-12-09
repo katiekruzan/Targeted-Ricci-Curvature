@@ -6,7 +6,7 @@ import pandas as pd
 import csv
 import numpy as np
 from itertools import combinations
-from gurobipy import Model, GRB, quicksum
+from gurobipy import Model, GRB, quicksum, LinExpr
 import time
 import os
 from numbers import Number
@@ -383,6 +383,10 @@ class UndirectedHypergraph(Hypergraph):
     
     
     def earthmover_distance_gurobi_distance_matrix(self, node_A, node_B, distance_matrix, verbose):
+        # now = time.time()
+        # rt = now-start
+        # write_scorecard(f'\t\tAt earthmover_..._matrix at time {rt}')
+                
         if node_A not in self.nodes or node_B not in self.nodes:
             print(f"Node {node_A} or {node_B} does not exist in the hypergraph.")
             return None  # Return None if either node does not exist
@@ -393,7 +397,6 @@ class UndirectedHypergraph(Hypergraph):
         if verbose:
             print('The node', node_A, 'has distribution', mu_A)
             print('The node', node_B, 'has distribution', mu_B)
-
 
         # Convert distributions from dictionary to list format 
         nodes_A = sorted(mu_A.keys())
@@ -409,7 +412,9 @@ class UndirectedHypergraph(Hypergraph):
     
         if abs(total_mass_A - total_mass_B) > 1e-6:
             raise ValueError('The total mass of the distributions mu_A and mu_B are not equal.')
-        
+        # now = time.time()
+        # rt = now-start
+        # write_scorecard(f'\t\tDone with distributions at time {rt}')
 
         # Create a mapping of nodes to their indices in the distance matrix.
         node_to_index = self.node_index
@@ -417,9 +422,12 @@ class UndirectedHypergraph(Hypergraph):
         try:
             # Create a new model in Gurobi.
             model = Model("EarthMoverDistance")
+            # now = time.time()
+            # rt = now-start
+            # write_scorecard(f'\t\tInit model at time {rt}')
 
             # Set up the log file
-            #log_filename = f"gurobi_log_{hyperedge_id}.log"
+            # log_filename = f"gurobi_log_{node_A}_to_{node_B}.log"
             # Set up the log file
             # '''
             # log_filename = f"gurobi_log_{hyperedge_id}.log"
@@ -428,14 +436,29 @@ class UndirectedHypergraph(Hypergraph):
             #model.setParam('OutputFlag', 1)
             # Create variables for the linear program.
             variables = model.addVars(mu_A.keys(), mu_B.keys(), name="z", lb=0)
+            now = time.time()
+            rt = now-start
+            write_scorecard(f'\t\tAdd variables at time {rt}')
             
             # Should make it less verbose
-            # if not verbose:
+            # if verbose:
+            #     print('boop')
+            #     model.Params.LogToConsole = 1
+            # else:
             model.Params.LogToConsole = 0
-
+            
+            expr = LinExpr(3.0)
+            expr.clear()
+            for x in mu_A:
+                for y in mu_B:
+                    expr.addTerms(distance_matrix[node_to_index[x]][node_to_index[y]], variables[x,y])
+            
             # Set the objective of the linear program to minimize the total cost.
-            model.setObjective(quicksum(distance_matrix[node_to_index[x]][node_to_index[y]] * variables[x, y]
-                                for x in mu_A for y in mu_B), GRB.MINIMIZE)
+            model.setObjective(expr, GRB.MINIMIZE)
+            now = time.time()
+            rt = now-start
+            write_scorecard(f'\t\tSet the objective at time {rt}')
+
 
             # Add constraints to ensure the conservation of mass.
             for x in mu_A:
@@ -443,9 +466,21 @@ class UndirectedHypergraph(Hypergraph):
 
             for y in mu_B:
                 model.addConstr(quicksum(variables[x, y] for x in mu_A) == mu_B[y], f"dirt_filling_{y}")
+            
+            # now = time.time()
+            # rt = now-start
+            # write_scorecard(f'\t\tAdded the constraints at time {rt}')
 
             # Start the timer, solve the model, and calculate the time taken.
+            # rt = time.time() - start
+            # if verbose:
+            #     print(f'\t\tgot here at time {rt}')
+            # write_scorecard(f'\t\tgot here at time {rt}')
             model.optimize()
+            # rt = time.time() - start
+            # if verbose:
+            #     print(f'Finished optimizing at time {rt}')
+            # write_scorecard(f'\t\tFinished optimizing at time {rt}')
 
             # Check the model status and process the results.
             if model.status == GRB.OPTIMAL:
@@ -470,6 +505,10 @@ class UndirectedHypergraph(Hypergraph):
         :param hyperedge_id: The identifier for the hyperedge.
         :return: The average EMD for all permutations of node pairs, or None if the hyperedge does not exist or has errors.
         """
+        # now = time.time()
+        # rt = now-start
+        # write_scorecard(f'\t\tAt earthmover_..._combinations {hyperedge_id} at time {rt}')
+                
         if hyperedge_id not in self.hyperedges:
             print(f"Hyperedge {hyperedge_id} does not exist.")
             return None
@@ -750,13 +789,16 @@ def update_orc_and_weights_iter(distance_matrix:list[list], graph:Hypergraph, ta
                 writer.writerow(['Hyperedge ID', 'ORC: (based on t-1 weights)', 'Weight:t'])
             
             for hyperedge_id in graph.hyperedges:
+                now = time.time()
+                rt = now-start
+                write_scorecard(f'\tStarted processing {hyperedge_id} at time {rt}')
                 # TODO: Figure out the difference in Directed//Undirected
                 if isinstance(graph, UndirectedHypergraph):
-                    orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose=False)
+                    orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose=verbose)
                 # Normalize the curvature
                 now = time.time()
                 rt = now-start
-                write_scorecard(f'\tTime to calculate ORC for hyperedge {hyperedge_id}: {rt}')
+                write_scorecard(f'\t\tTime to finish calculation ORC for hyperedge {hyperedge_id}: {rt}')
                 normalized_orc = ricci_normalizing(orc)
                 # un-normalizing
                 # normalized_orc = orc
@@ -864,15 +906,14 @@ if __name__ == "__main__":
     # Check if the ratio of the weights is more or less tha same 
     # average absolute difference and see if that's small
     # try a network such that the sum of the two weights are the same
-    '''
-    '''
+
     directed_flag = False
     verbose = False
-    
+     
     clean_output(verbose)
     
-    #For now, the nodes have to be labeled the same way. We're going to assume the hyperedges are going to be labeled the same.
-    # This section works
+    # For now, the nodes have to be labeled the same way. We're going to assume 
+    # the hyperedges are going to be labeled the same.
     
     '''
     The data needs to come in as a csv with three columns labeled 'source', 'target', and 'weight'
@@ -883,8 +924,8 @@ if __name__ == "__main__":
     # TODO: Also check out the directed graphs
     '''
     start = time.time()
-    target_filename = 'ERgraph50nodesweight1.csv'
-    source_filename = 'ERgraph50n5changev4.csv'
+    target_filename = 'ERgraph100nodep4.csv'
+    source_filename = 'ERgraph100n5changev3.csv'
     
     data_target = pd.read_csv(f'inputfiles/{target_filename}', dtype ={'source': str, 'target':str}, sep=',')  
     data_source = pd.read_csv(f'inputfiles/{source_filename}', dtype ={'source': str, 'target':str}, sep=',')  
@@ -1022,7 +1063,7 @@ if __name__ == "__main__":
             write_scorecard('\n\n----- Results -----')
             write_scorecard(f'Source to target distance is {i}')
             break
-        
+    
     if not allstable:
         # print(target_graph.weights)
         write_scorecard('Source to target did not stablize.')
