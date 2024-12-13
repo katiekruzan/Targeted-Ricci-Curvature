@@ -436,9 +436,9 @@ class UndirectedHypergraph(Hypergraph):
             #model.setParam('OutputFlag', 1)
             # Create variables for the linear program.
             variables = model.addVars(mu_A.keys(), mu_B.keys(), name="z", lb=0)
-            now = time.time()
-            rt = now-start
-            write_scorecard(f'\t\tAdd variables at time {rt}')
+            # now = time.time()
+            # rt = now-start
+            # write_scorecard(f'\t\tAdd variables at time {rt}')
             
             # Should make it less verbose
             # if verbose:
@@ -455,9 +455,9 @@ class UndirectedHypergraph(Hypergraph):
             
             # Set the objective of the linear program to minimize the total cost.
             model.setObjective(expr, GRB.MINIMIZE)
-            now = time.time()
-            rt = now-start
-            write_scorecard(f'\t\tSet the objective at time {rt}')
+            # now = time.time()
+            # rt = now-start
+            # write_scorecard(f'\t\tSet the objective at time {rt}')
 
 
             # Add constraints to ensure the conservation of mass.
@@ -789,16 +789,16 @@ def update_orc_and_weights_iter(distance_matrix:list[list], graph:Hypergraph, ta
                 writer.writerow(['Hyperedge ID', 'ORC: (based on t-1 weights)', 'Weight:t'])
             
             for hyperedge_id in graph.hyperedges:
-                now = time.time()
-                rt = now-start
-                write_scorecard(f'\tStarted processing {hyperedge_id} at time {rt}')
+                # now = time.time()
+                # rt = now-start
+                # write_scorecard(f'\tStarted processing {hyperedge_id} at time {rt}')
                 # TODO: Figure out the difference in Directed//Undirected
                 if isinstance(graph, UndirectedHypergraph):
                     orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose=verbose)
                 # Normalize the curvature
-                now = time.time()
-                rt = now-start
-                write_scorecard(f'\t\tTime to finish calculation ORC for hyperedge {hyperedge_id}: {rt}')
+                # now = time.time()
+                # rt = now-start
+                # write_scorecard(f'\tTime to finish calculation ORC for hyperedge {hyperedge_id}: {rt}')
                 normalized_orc = ricci_normalizing(orc)
                 # un-normalizing
                 # normalized_orc = orc
@@ -925,7 +925,7 @@ if __name__ == "__main__":
     '''
     start = time.time()
     target_filename = 'ERgraph100nodep4.csv'
-    source_filename = 'ERgraph100n5changev3.csv'
+    source_filename = 'ERgraph100n5changev4.csv'
     
     data_target = pd.read_csv(f'inputfiles/{target_filename}', dtype ={'source': str, 'target':str}, sep=',')  
     data_source = pd.read_csv(f'inputfiles/{source_filename}', dtype ={'source': str, 'target':str}, sep=',')  
@@ -1030,11 +1030,11 @@ if __name__ == "__main__":
     for i in range(1, total_iterations + 1):
         print('Working on itteration', i)
         distance_matrix_i = source_graph.floyd_warshall()
-        save_matrix_csv(distance_matrix_i, f'outputfiles/distance_matrix_source_itteration_{i}.csv')
+        # save_matrix_csv(distance_matrix_i, f'outputfiles/distance_matrix_source_itteration_{i}.csv')
         
-        now = time.time()
-        rt = now-start
-        write_scorecard(f'Time for distance matrix {i}: {rt}')
+        # now = time.time()
+        # rt = now-start
+        # write_scorecard(f'Time for distance matrix {i}: {rt}')
         update_orc_and_weights_iter(distance_matrix_i, source_graph, target_graph, iteration=i, verbose=verbose)
         now = time.time()
         rt = now-start
@@ -1050,11 +1050,12 @@ if __name__ == "__main__":
             new = clist[-1]
             # print(e, old, new)
             if old != 0:
-                error = abs((old-new)/old)
+                # error = abs((old-new)/old)
+                error = abs(old-new)
             else: error = abs(old-new)
             if error > 0.01:
-                if verbose:
-                    print('unstable for edge ', e, ' with error ', error)
+                # if verbose:
+                print('unstable for edge ', e, ' with error ', error)
                 finustab = e
                 allstable = False
                 break
@@ -1106,6 +1107,10 @@ if __name__ == "__main__":
         print('Working on itteration', i)
         distance_matrix_i = source_graph.floyd_warshall()
         update_orc_and_weights_iter(distance_matrix_i, source_graph, target_graph, iteration=i, verbose=False, op_flag=True)
+        now = time.time()
+        rt = now-start
+        write_scorecard(f'Time for ORC {i}: {rt}')
+        
         allstable = True
         finustab = None
         if i == 1: # take care of the getting started case
@@ -1114,16 +1119,17 @@ if __name__ == "__main__":
             clist = source_graph.ricci_curvature[e]
             old = clist[-2]
             new = clist[-1]
-            error = abs((old-new)/old) #error as a percentage of old
-            # error = abs(old-new)
+            # error = abs((old-new)/old) #error as a percentage of old
+            error = abs(old-new)
             if error > 0.01:
-                if verbose:
-                    print('unstable for edge ', e, ' with error ', error)
+                # if verbose:
+                print('unstable for edge ', e, ' with error ', error)
                 finustab = e
                 allstable = False
                 break
         if allstable:
             print('STABILIZED! Target to source distance is ',i)
+            write_scorecard('\n\n----- Results -----')
             write_scorecard(f'Target to source distance is {i}')
             break
             
@@ -1131,4 +1137,8 @@ if __name__ == "__main__":
         # print(target_graph.weights)
         write_scorecard('Target to source did not stablize.')
         print(source_graph.weights[finustab])
+        
+    now = time.time()
+    rt = now-start
+    write_scorecard(f'Time for final: {rt}')
     
