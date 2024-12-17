@@ -22,15 +22,15 @@ class Hypergraph:
         self.weights = {} # dict that had hyperedge ids to weights
         self.ricci_curvature = {} #dict with hyperedge id to list of ricci curvatures (floats)
         self.node_index = {}
-            
-    def add_node(self, node:any) -> None:
+                       
+    def add_node(self, node:any) -> None: 
         '''Function to add a node to the hypergraph. The type is not set
 
         :param any node: The node to be added
         '''      
         self.nodes.add(node)
         return
-    
+       
     def add_ricci_curvature(self, hyperedge_id:str, orc:float)-> None:
         '''Function to add ollivier ricci curvature for all hyperedges for each iteration.
             It will be appending to a list
@@ -42,7 +42,7 @@ class Hypergraph:
             self.ricci_curvature[hyperedge_id] = []  # Initialize with an empty list if key doesn't exist
         self.ricci_curvature[hyperedge_id].append(orc)
         return
-        
+             
     def add_weights(self, hyperedge_id:str, weight: Number) -> None:
         '''Function to add weights for all hyperedges for each iteration.
             It will be appending to a list
@@ -52,26 +52,24 @@ class Hypergraph:
         ''' 
         if weight is not None:
             self.weights[hyperedge_id].append(weight)
-    
+       
     def update_node_index(self) -> None:
         '''The goal is to ensure there is a static node index for the graph. This function generates it
         '''
         self.node_index = {node: idx for idx, node in enumerate(list(self.nodes))}
-            
+                        
     def is_2_uniform(self) -> bool:
         '''Check if size of each edge is 2
 
         :return bool: true if graph is 2 uniform
         '''
-        # TODO: find a way to do this quicker
         for edges in self.hyperedges.items():
             if len(edges) != 2:
                 return False
         return True
-            
+               
     def is_weakly_connected(self)-> bool:
         '''Check if the underlying graph is weakly connected
-        # TODO: think if there is a quicker way other than DFS to do this
 
         :return bool: True if weakly connected
         '''        
@@ -100,12 +98,12 @@ class Hypergraph:
         start_node = next(iter(self.nodes))
         dfs(start_node)
         return visited == self.nodes   
-  
     
     def floyd_warshall(self) -> list[list]:
         '''Use the Floyd-Warshall algorithm to find the shortest distances between
-           each pair of vertices. Right now, if you cannot get from one node to another,
-           the distance will be 'inf'. This will be relavant in the case of directed, not strongly connected graphs.
+           each pair of vertices. Right now, if you cannot get from one node to 
+           another, the distance will be 'inf'. This will be relevant in the 
+           case of directed, not strongly connected graphs.
 
         :return list[list]: a matrix with the shortest distances
         '''        
@@ -129,8 +127,6 @@ class Hypergraph:
         
         # Set the distance for directly connected nodes based on edge weights
         for hyperedge_id, nodes in self.hyperedges.items():
-            # print(hyperedge_id)
-            # print(nodes)
             if isinstance(self, UndirectedHypergraph):
                 tail_set, head_set = nodes, nodes
             else: 
@@ -152,7 +148,8 @@ class Hypergraph:
             for tail in tail_set:
                 for head in head_set:
                     # Update the distance with the weight of the edge
-                    dist[node_index[tail]][node_index[head]] = min(dist[node_index[tail]][node_index[head]],self.weights[hyperedge_id][-1])  # Using the last weight in the list
+                    dist[node_index[tail]][node_index[head]] = min(dist[node_index[tail]][node_index[head]],
+                                                                   self.weights[hyperedge_id][-1])  # Using the last weight in the list
         
         # Floyd-Warshall algorithm to update distances
         for k in self.nodes:
@@ -160,19 +157,9 @@ class Hypergraph:
                 for j in self.nodes:
                     if dist[node_index[i]][node_index[k]] + dist[node_index[k]][node_index[j]] < dist[node_index[i]][node_index[j]]:
                         dist[node_index[i]][node_index[j]] = dist[node_index[i]][node_index[k]] + dist[node_index[k]][node_index[j]]
-        
-        # Replace 'inf' with 0 for pairs of nodes that have no path between them
-        #TODO: Check if this is a good idea. I think this is odd, so will drop for now. Like probably? but also nodes have dist 0 to themselves
-        '''
-        for i in range(node_count):
-            for j in range(node_count):
-                if dist[i][j] == float('inf'):
-                    dist[i][j] = 0 
-        '''
 
         return dist
-        
-        
+     
     def calculate_degrees(self):
         '''
         Return the max degree, min degree, and average degree values. 
@@ -207,7 +194,7 @@ class UndirectedHypergraph(Hypergraph):
 
         :param str hyperedge_id: the name you would like to be used for the hyperedge
         :param list nodes: a list of the adjacent nodes
-        :param list weight_list: Should start as a list with a single element (expect for odd cases), defaults to [1]
+        :param list weight_list: Should start as a list with a single element (expect for weird cases), defaults to [1]
         :param bool verbose: verbose flag, defaults to True
         :raises ValueError: If the nodes is not a list, will raise this error
         '''        
@@ -229,7 +216,7 @@ class UndirectedHypergraph(Hypergraph):
         if verbose:
             f'Adding hyperedge {hyperedge_id} with nodes {nodes}'
         self.hyperedges[hyperedge_id] = nodes
-        self.weights[hyperedge_id] = weight_list #init the weights to [1]
+        self.weights[hyperedge_id] = weight_list
         return
     
     def add_missing_target_edges(self, targ_graph:Hypergraph, targ_dist_mat: list[list], verbose:bool)->None:
@@ -258,15 +245,13 @@ class UndirectedHypergraph(Hypergraph):
         for e in set(src_graph.hyperedges) - set(self.hyperedges):
             self.add_hyperedge(e, src_graph.hyperedges[e], [0], verbose)
         
-    
-    def build_from_dataframe(self, df:pd.DataFrame, verbose=True):
+    def build_from_dataframe(self, df:pd.DataFrame, verbose=True)-> None:
         '''Build hypergraph from a DataFrame
 
         :param pd.DataFrame df: has the columns 'source', 'target', and 'weight'
         :param bool verbose: verbose flag, defaults to True
         '''        
         # make an edge from each row in the csv
-        #TODO: make this more general? Be able to catch errors
         for _, row in df.iterrows():
             node1 = row['source'].strip() #start
             node2 = row['target'].strip() #end
@@ -277,8 +262,14 @@ class UndirectedHypergraph(Hypergraph):
                 print(f'Added hyperedge {edgeid} between {node1} and {node2}')
         return
     
-    def node_degree(self, node):
-        """Calculate the degree of a node. Degree is the number of hyperedges containing this node."""
+    def node_degree(self, node) -> int:
+        ''' Calculate the degree of a node. Degree is the number of hyperedges 
+        containing this node.
+
+        :param _type_ node: the node we want to actually capture info for
+        :raises ValueError: Raises if the node doesn't exist in the graph
+        :return int: The number of hyperedges containing the node
+        '''
         if node not in self.nodes:
             raise ValueError("Node does not exist in the graph.")
         return sum(node in hyperedge for hyperedge in self.hyperedges.values())
@@ -382,11 +373,7 @@ class UndirectedHypergraph(Hypergraph):
         return probability_distribution
     
     
-    def earthmover_distance_gurobi_distance_matrix(self, node_A, node_B, distance_matrix, verbose):
-        # now = time.time()
-        # rt = now-start
-        # write_scorecard(f'\t\tAt earthmover_..._matrix at time {rt}')
-                
+    def earthmover_distance_gurobi_distance_matrix(self, node_A, node_B, distance_matrix, verbose):        
         if node_A not in self.nodes or node_B not in self.nodes:
             print(f"Node {node_A} or {node_B} does not exist in the hypergraph.")
             return None  # Return None if either node does not exist
@@ -412,9 +399,6 @@ class UndirectedHypergraph(Hypergraph):
     
         if abs(total_mass_A - total_mass_B) > 1e-6:
             raise ValueError('The total mass of the distributions mu_A and mu_B are not equal.')
-        # now = time.time()
-        # rt = now-start
-        # write_scorecard(f'\t\tDone with distributions at time {rt}')
 
         # Create a mapping of nodes to their indices in the distance matrix.
         node_to_index = self.node_index
@@ -422,10 +406,6 @@ class UndirectedHypergraph(Hypergraph):
         try:
             # Create a new model in Gurobi.
             model = Model("EarthMoverDistance")
-            # now = time.time()
-            # rt = now-start
-            # write_scorecard(f'\t\tInit model at time {rt}')
-
             # Set up the log file
             # log_filename = f"gurobi_log_{node_A}_to_{node_B}.log"
             # Set up the log file
@@ -435,11 +415,7 @@ class UndirectedHypergraph(Hypergraph):
             # '''
             #model.setParam('OutputFlag', 1)
             # Create variables for the linear program.
-            variables = model.addVars(mu_A.keys(), mu_B.keys(), name="z", lb=0)
-            # now = time.time()
-            # rt = now-start
-            # write_scorecard(f'\t\tAdd variables at time {rt}')
-            
+            variables = model.addVars(mu_A.keys(), mu_B.keys(), name="z", lb=0)           
             # Should make it less verbose
             # if verbose:
             #     print('boop')
@@ -455,10 +431,6 @@ class UndirectedHypergraph(Hypergraph):
             
             # Set the objective of the linear program to minimize the total cost.
             model.setObjective(expr, GRB.MINIMIZE)
-            # now = time.time()
-            # rt = now-start
-            # write_scorecard(f'\t\tSet the objective at time {rt}')
-
 
             # Add constraints to ensure the conservation of mass.
             for x in mu_A:
@@ -467,20 +439,8 @@ class UndirectedHypergraph(Hypergraph):
             for y in mu_B:
                 model.addConstr(quicksum(variables[x, y] for x in mu_A) == mu_B[y], f"dirt_filling_{y}")
             
-            # now = time.time()
-            # rt = now-start
-            # write_scorecard(f'\t\tAdded the constraints at time {rt}')
-
             # Start the timer, solve the model, and calculate the time taken.
-            # rt = time.time() - start
-            # if verbose:
-            #     print(f'\t\tgot here at time {rt}')
-            # write_scorecard(f'\t\tgot here at time {rt}')
             model.optimize()
-            # rt = time.time() - start
-            # if verbose:
-            #     print(f'Finished optimizing at time {rt}')
-            # write_scorecard(f'\t\tFinished optimizing at time {rt}')
 
             # Check the model status and process the results.
             if model.status == GRB.OPTIMAL:
@@ -496,7 +456,6 @@ class UndirectedHypergraph(Hypergraph):
         except Exception as e:
             print(f"Gurobi Error: {e}\n for nodes {node_A} and {node_B}")
             return None
-
     
     
     def earthmover_distance_hyperedge_combinations(self, hyperedge_id:str, distance_matrix:list[list], verbose:bool):
@@ -547,23 +506,44 @@ class UndirectedHypergraph(Hypergraph):
     
   
 class DirectedHypergraph(Hypergraph):
-    def add_hyperedge(self, hyperedge_id:str, tail_set:set, head_set:set, weight_list = [1]):
-        '''Function to add a hyperedge to the hypergraph, if the nodes are not there, will add the nodes'''
+    def add_hyperedge(self, hyperedge_id:str, tail_set:set, head_set:set, weight_list = [1], verbose=True) -> None:
+        '''Function to add a hyperedge to the hypergraph, if the nodes are not 
+        there, will add the nodes
+        
+        :param str hyperedge_id: the name you would like to be used for the hyperedge
+        :param set tail_set: a list of the tail nodes (nodes leaving from)
+        :param set head_set: a list of the head nodes (nodes going to)
+        :param list weight_list: Should start as a list with a single element (expect for weird cases), defaults to [1]
+        :param bool verbose: verbose flag, defaults to True
+        '''
+        # Check if hyperedge already exists
+        if hyperedge_id in self.hyperedges:
+            print(f"Hyperedge {hyperedge_id} already exists with nodes {self.hyperedges[hyperedge_id]}")
+            return
+        
         # Add missing nodes to the node set
         for node in tail_set.union(head_set):
             if node not in self.nodes:
                 self.add_node(node)
-        
+                
+        # Add the hyperedge
+        if verbose:
+            f'Adding hyperedge {hyperedge_id} with tail nodes {tail_set} and head nodes {head_set}'
         self.hyperedges[hyperedge_id] = (tail_set, head_set)
         self.weights[hyperedge_id]= weight_list
+        return
         
     def add_missing_target_edges(self, targ_graph:Hypergraph):
-        #TODO: check if this works for Digraphs
+        #TODO: check if this works for Digraphs - need to have set up the same way as in undirected
         for e in set(targ_graph.hyperedges) - set(self.hyperedges):
             self.add_hyperedge(e, targ_graph.hyperedges[e][0], targ_graph.hyperedges[e][1], targ_graph.weights[e])
 
-    def build_from_dataframe(self, df:pd.DataFrame, verbose=True):
-        '''Build hypergraph from a DataFrame'''
+    def build_from_dataframe(self, df:pd.DataFrame, verbose=True) -> None:
+        '''Build hypergraph from a DataFrame
+
+        :param pd.DataFrame df: has the columns 'source', 'target', and 'weight'
+        :param bool verbose: verbose flag, defaults to True
+        '''
         # make an edge from each row in the csv
         for _, row in df.iterrows():
             node1 = row['source'].strip() #start
@@ -574,11 +554,12 @@ class DirectedHypergraph(Hypergraph):
             if verbose:
                 print(f'Added hyperedge {edgeid} with head set {node1} and tail set {node2}')
         return
-    
-            
+       
     def get_underlying_edges(self) -> set:
         '''Function to get the edges from the hyperedges.
             We're basically going to make it look like an undirected graph
+
+        :return set: a set of edges with just the edgeid and then the nodes in a list
         '''
         edges = dict()
         
@@ -587,22 +568,26 @@ class DirectedHypergraph(Hypergraph):
             edges[key] = list(set(tail.union(head)))
         return edges
     
-    def node_degree(self, node):
-        """Calculate the degree of a node. Degree is the number of hyperedges containing this node.
+    def node_degree(self, node) -> np.array:
+        '''Calculate the degree of a node. Degree is the number of hyperedges 
+        containing this node.
+        
         Will always return a numpy array (in-deg, out-deg)
-        """
+    
+        :param _type_ node: the node we want to actually capture info for
+        :raises ValueError: _description_
+        :return _type_: array of degrees with (in-deg, out-deg)
+        '''
         if node not in self.nodes:
             raise ValueError("Node does not exist in the graph.")
         
         d_in_x = 0
-        for _, (_, head_set) in self.hyperedges.items():
+        d_out_x = 0
+        for _, (tail_set, head_set) in self.hyperedges.items():
             if node in head_set:
                 d_in_x += 1
-        
-        d_out_x = 0
-        for _, (tail_set, _) in self.hyperedges.items():
             if node in tail_set:
-                d_out_x += 1
+                d_out_x += 1  
         
         return [d_in_x, d_out_x]
 
@@ -925,7 +910,7 @@ if __name__ == "__main__":
     '''
     start = time.time()
     target_filename = 'ERgraph100nodep4.csv'
-    source_filename = 'ERgraph100n5changev3.csv'
+    source_filename = 'ERgraph100n100changev3.csv'
     
     data_target = pd.read_csv(f'inputfiles/{target_filename}', dtype ={'source': str, 'target':str}, sep=',')  
     data_source = pd.read_csv(f'inputfiles/{source_filename}', dtype ={'source': str, 'target':str}, sep=',')  
@@ -999,7 +984,6 @@ if __name__ == "__main__":
     target_distance_matrix = target_graph.floyd_warshall()
     save_matrix_csv(target_distance_matrix, 'outputfiles/undirected_target_dist_fw.csv')
     
-    
     now = time.time()
     rt = now-start
     write_scorecard(f'Time to make the target distance matrices: {rt}')
@@ -1024,17 +1008,12 @@ if __name__ == "__main__":
     now = time.time()
     rt = now-start
     write_scorecard(f'Time to calc source ORC: {rt}')
-    # quit()
     
-    total_iterations = 100
+    total_iterations = 200
     for i in range(1, total_iterations + 1):
         print('Working on itteration', i)
         distance_matrix_i = source_graph.floyd_warshall()
-        # save_matrix_csv(distance_matrix_i, f'outputfiles/distance_matrix_source_itteration_{i}.csv')
-        
-        # now = time.time()
-        # rt = now-start
-        # write_scorecard(f'Time for distance matrix {i}: {rt}')
+                
         update_orc_and_weights_iter(distance_matrix_i, source_graph, target_graph, iteration=i, verbose=verbose)
         now = time.time()
         rt = now-start
@@ -1042,7 +1021,9 @@ if __name__ == "__main__":
         
         allstable = True
         finustab = None
-        if i == 1: # take care of the getting started case
+        if i == 1: 
+            #TODO: fix this weirdness
+            # take care of the getting started case
             continue
         errorlist = []
         for e in source_graph.hyperedges:
@@ -1051,11 +1032,18 @@ if __name__ == "__main__":
             new = clist[-1]
             if old != 0:
                 error = abs((old-new)/old)
-            else: error = abs(old-new)
-            errorlist.append(error)
-        if np.average(errorlist) > 0.03:
+            else: 
+                error = abs(old-new)
+            if error > 0.05:
+                # if verbose:
+                print('unstable for edge ', e, ' with error ', error)
+                finustab = e
+                allstable = False
+                break
+            # errorlist.append(error)
+        # if np.average(errorlist) > 0.03:
             # if verbose:
-            print('average error too high with error average of: ', np.average(errorlist))
+            # print('average error too high with error average of: ', np.average(errorlist))
         else:
         # if allstable:
             print('STABILIZED! Source to target distance is ',i)
@@ -1117,21 +1105,20 @@ if __name__ == "__main__":
             clist = source_graph.ricci_curvature[e]
             old = clist[-2]
             new = clist[-1]
-            # error = abs((old-new)/old) #error as a percentage of old
             # error = abs(old-new)
             if old != 0:
                 error = abs((old-new)/old)
             else: error = abs(old-new)
-            # if error > 0.01:
-            #     # if verbose:
-            #     print('unstable for edge ', e, ' with error ', error)
-            #     finustab = e
-            #     allstable = False
-            #     break
-            errorlist.append(error)
-        if np.average(errorlist) > 0.03:
+            if error > 0.05:
+                # if verbose:
+                print('unstable for edge ', e, ' with error ', error)
+                finustab = e
+                allstable = False
+                break
+            # errorlist.append(error)
+        # if np.average(errorlist) > 0.03:
             # if verbose:
-            print('average error too high with error average of: ', np.average(errorlist))
+            # print('average error too high with error average of: ', np.average(errorlist))
         # if allstable:
         else:
             print('STABILIZED! Target to source distance is ',i)
