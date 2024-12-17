@@ -121,7 +121,7 @@ class Hypergraph:
         dist = [[float('inf') for _ in range(node_count)] for _ in range(node_count)]
         
         # Set the diagonal to 0 (distance from each node to itself) 
-        # #TODO: See if this makes sense for directed
+        # TODO: See if this makes sense for directed
         for i in range(node_count):
             dist[i][i] = 0
         
@@ -273,7 +273,6 @@ class UndirectedHypergraph(Hypergraph):
         if node not in self.nodes:
             raise ValueError("Node does not exist in the graph.")
         return sum(node in hyperedge for hyperedge in self.hyperedges.values())
-    
     
     def find_hyperedges_containing_nodes(self, *nodes):
         '''
@@ -495,7 +494,7 @@ class UndirectedHypergraph(Hypergraph):
             weight = self.weights[hyperedge_id][-1]
             if weight == 0:
                 # this is the orc 
-                # #TODO: check to see if this makes sense for weight =0 in a real way
+                # TODO: check to see if this makes sense for weight =0 in a real way
                 return 1 - average_emd
             else:
                 # this is the orc. This is the EMD/dist(u,v) and dist(u,v) will just be the weight of the edge
@@ -576,13 +575,14 @@ class DirectedHypergraph(Hypergraph):
     
         :param _type_ node: the node we want to actually capture info for
         :raises ValueError: _description_
-        :return _type_: array of degrees with (in-deg, out-deg)
+        :return np.array: array of degrees with (in-deg, out-deg)
         '''
         if node not in self.nodes:
             raise ValueError("Node does not exist in the graph.")
         
         d_in_x = 0
         d_out_x = 0
+        # TODO: double check this works
         for _, (tail_set, head_set) in self.hyperedges.items():
             if node in head_set:
                 d_in_x += 1
@@ -590,7 +590,6 @@ class DirectedHypergraph(Hypergraph):
                 d_out_x += 1  
         
         return [d_in_x, d_out_x]
-
     
     def calculate_probability_distributions(self, hyperedge_id):
         #TODO: double check for correctness
@@ -796,7 +795,8 @@ def update_orc_and_weights_iter(distance_matrix:list[list], graph:Hypergraph, ta
                     
                     if weight != 0:
                         #simple version
-                        wtplus1 = weight*(1  - (normalized_orc - orc_targ))
+                        step = 1
+                        wtplus1 = weight*(1  - step*(normalized_orc - orc_targ))
                         normalized_weight = wtplus1
                     else:
                         normalized_weight = 0
@@ -884,6 +884,114 @@ def write_scorecard(line:str)-> None:
     with open('outputfiles/scorecard.txt', 'a+') as f:
         f.write(line)
         f.write('\n')
+        
+def clock_time(message:str)-> None:
+    now = time.time()
+    rt = now-start
+    write_scorecard(f'{message}: {rt}')
+    return
+        
+def early_analysis(src_graph, verbose):
+    connected = src_graph.is_weakly_connected()
+    max_degree, min_degree, avg_degree = src_graph.calculate_degrees()
+
+    if verbose:
+        print('type of graph', type(src_graph))
+        print("Number of edges:",len(src_graph.hyperedges)) #Printing the number of (hyper)edges in our network.
+        print("Number of nodes",len(src_graph.nodes)) #Printing the number of nodes in the network.
+        print('The actual nodes:', src_graph.nodes)
+        print('The actual edges with weights:', src_graph.weights)
+        
+        print("The hypergraph is weakly connected." if connected else "The hypergraph is not weakly connected.")
+        
+        print(f"Max Degree: {max_degree}")
+        print(f"Min Degree: {min_degree}")
+        print(f"Average Degree: {avg_degree}")
+        
+    write_scorecard('----- Graph Statistics -----')
+    write_scorecard(f'Type of Graph: {type(src_graph)}')
+    write_scorecard(f'Number of edges: {len(src_graph.hyperedges)}')
+    write_scorecard(f'Number of nodes: {len(src_graph.nodes)}')
+    if connected: write_scorecard('The hypergraph is weakly connected.')
+    else: write_scorecard('The hypergraph is not weakly connected.')
+    write_scorecard(f"Max Degree: {max_degree}")
+    write_scorecard(f"Min Degree: {min_degree}")
+    write_scorecard(f"Average Degree: {avg_degree}")
+    return
+        
+def one_direction_of_work(src_graph:Hypergraph, targ_graph:Hypergraph, tot_its = 100):
+    print('working on distance matrices')
+    distance_matrix = src_graph.floyd_warshall()
+    save_matrix_csv(distance_matrix, 'outputfiles/undirected_source_dist_fw.csv')
+    
+    clock_time('Time to make the source distance matrix')
+
+    target_distance_matrix = targ_graph.floyd_warshall()
+    save_matrix_csv(target_distance_matrix, 'outputfiles/undirected_target_dist_fw.csv')
+    
+    clock_time('Time to make the target distance matrix')
+
+    # TODO: Check this works (not testing it right now)
+    if set(targ_graph.hyperedges) != set(src_graph.hyperedges):
+        print ('Taking care of missing edges')
+        # add edges that are in the target but not the source
+        src_graph.add_missing_target_edges(targ_graph, target_distance_matrix, verbose)
+
+    print('starting ricci curvature')
+    #TODO: check to see if the guys are Known Node Correspondence. 
+    # Maybe just check that all the nodes are labeled the same.
+
+    calculate_target_orc(target_distance_matrix, targ_graph, verbose)
+
+    clock_time('Time to calc target ORC')
+
+    update_orc_and_weights_iter(distance_matrix, src_graph, targ_graph, iteration=0, verbose=verbose)
+
+    clock_time('Time to calc source ORC')
+    
+    for i in range(1, tot_its + 1):
+        print('Working on itteration', i)
+        distance_matrix_i = src_graph.floyd_warshall()
+                
+        update_orc_and_weights_iter(distance_matrix_i, src_graph, targ_graph, iteration=i, verbose=verbose)
+        clock_time(f'Time for ORC {i}')
+              
+        allstable = True
+        finustab = None
+        if i == 1: 
+            #TODO: fix this weirdness
+            # take care of the getting started case
+            continue
+        for e in src_graph.hyperedges:
+            clist = src_graph.ricci_curvature[e]
+            old = clist[-2]
+            new = clist[-1]
+            if old != 0:
+                error = abs((old-new)/old)
+            else: 
+                error = abs(old-new)
+            if error > 0.05:
+                # if verbose:
+                print('unstable for edge ', e, ' with error ', error)
+                finustab = e
+                allstable = False
+                break
+            # errorlist.append(error)
+        # if np.average(errorlist) > 0.03:
+            # if verbose:
+            # print('average error too high with error average of: ', np.average(errorlist))
+        # else:
+        if allstable:
+            print('STABILIZED! Source to target distance is ',i)
+            write_scorecard('\n\n----- Results -----')
+            write_scorecard(f'Source to target distance is {i}')
+            break
+    
+    if not allstable:
+        write_scorecard('Source to target did not stablize.')
+        print(src_graph.weights[finustab])
+
+    return
     
   
 if __name__ == "__main__": 
@@ -905,12 +1013,11 @@ if __name__ == "__main__":
     This will be read as a pandas dataframe. 
     And the nodes must be labeled the same in both graphs for this to work
     
-    # TODO: Change the weight of 5 edges, the 100 edges, and 1000 edges for 10 different pairs. For 100 node graphs
     # TODO: Also check out the directed graphs
     '''
     start = time.time()
     target_filename = 'ERgraph100nodep4.csv'
-    source_filename = 'ERgraph100n100changev3.csv'
+    source_filename = 'ERgraph100n5changev3.csv'
     
     data_target = pd.read_csv(f'inputfiles/{target_filename}', dtype ={'source': str, 'target':str}, sep=',')  
     data_source = pd.read_csv(f'inputfiles/{source_filename}', dtype ={'source': str, 'target':str}, sep=',')  
@@ -919,219 +1026,51 @@ if __name__ == "__main__":
     write_scorecard('----- Targeted Ricci Curvature -----')
     write_scorecard(f'target filename: {target_filename}')
     write_scorecard(f'source filename: {source_filename}')
-    now = time.time()
-    rt = now-start
-    write_scorecard(f'Time to read the data in seconds: {rt}')
     
+    clock_time('Time to read the data in seconds')
+  
     if directed_flag:
-        source_graph = DirectedHypergraph()
-        target_graph = DirectedHypergraph()
+        source_graph1 = DirectedHypergraph()
+        target_graph1 = DirectedHypergraph()
     else:
-        source_graph = UndirectedHypergraph()
-        target_graph = UndirectedHypergraph()        
+        source_graph1 = UndirectedHypergraph()
+        target_graph1 = UndirectedHypergraph()        
           
     print('building source')          
-    source_graph.build_from_dataframe(data_source, verbose)
+    source_graph1.build_from_dataframe(data_source, verbose)
     print('building target')
-    target_graph.build_from_dataframe(data_target, verbose)
-    now = time.time()
-    rt = now-start
-    write_scorecard(f'Time to build the graphs: {rt}')
+    target_graph1.build_from_dataframe(data_target, verbose)
     
-    if not (source_graph.is_2_uniform() and target_graph.is_2_uniform()) :
+    clock_time('Time to build the graphs')
+    
+    if not (source_graph1.is_2_uniform() and target_graph1.is_2_uniform()) :
         print('This has not been fully fleshed out for hypergraphs. Please give a 2-uniform graph')
         quit()
+    
+    early_analysis(source_graph1, verbose)
          
-    connected = source_graph.is_weakly_connected()
-    max_degree, min_degree, avg_degree = source_graph.calculate_degrees()
-    
-    if verbose:
-        print('type of graph', type(source_graph))
-        print("Number of edges:",len(source_graph.hyperedges)) #Printing the number of (hyper)edges in our network.
-        print("Number of nodes",len(source_graph.nodes)) #Printing the number of nodes in the network.
-        print('The actual nodes:', source_graph.nodes)
-        print('The actual edges with weights:', source_graph.weights)
-        
-        print("The hypergraph is weakly connected." if connected else "The hypergraph is not weakly connected.")
-        
-        print(f"Max Degree: {max_degree}")
-        print(f"Min Degree: {min_degree}")
-        print(f"Average Degree: {avg_degree}")
-    
-    write_scorecard('----- Graph Statistics -----')
-    write_scorecard(f'Type of Graph: {type(source_graph)}')
-    write_scorecard(f'Number of edges: {len(source_graph.hyperedges)}')
-    write_scorecard(f'Number of nodes: {len(source_graph.nodes)}')
-    if connected: write_scorecard('The hypergraph is weakly connected.')
-    else: write_scorecard('The hypergraph is not weakly connected.')
-    write_scorecard(f"Max Degree: {max_degree}")
-    write_scorecard(f"Min Degree: {min_degree}")
-    write_scorecard(f"Average Degree: {avg_degree}")
-    now = time.time()
-    rt = now-start
-    write_scorecard(f'Time to analyze graphs: {rt}')
-    
-    #TODO: rewrite the following as a little function we can send things to
-    
-    print('working on distance matrices')
-    distance_matrix = source_graph.floyd_warshall()
-    save_matrix_csv(distance_matrix, 'outputfiles/undirected_source_dist_fw.csv')
-    
-    now = time.time()
-    rt = now-start
-    write_scorecard(f'Time to make the source distance matrix: {rt}')
-   
-    target_distance_matrix = target_graph.floyd_warshall()
-    save_matrix_csv(target_distance_matrix, 'outputfiles/undirected_target_dist_fw.csv')
-    
-    now = time.time()
-    rt = now-start
-    write_scorecard(f'Time to make the target distance matrices: {rt}')
-    
-    # TODO: Check this works (not testing it right now)
-    if set(target_graph.hyperedges) != set(source_graph.hyperedges):
-        print ('Taking care of missing edges')
-        # add edges that are in the target but not the source
-        source_graph.add_missing_target_edges(target_graph, target_distance_matrix, verbose)
-        
-    print('starting ricci curvature')
-    #TODO: check to see if the guys are Known Node Correspondence. 
-    # Maybe just check that all the nodes are labeled the same.
-    
-    calculate_target_orc(target_distance_matrix, target_graph, verbose)
-    
-    now = time.time()
-    rt = now-start
-    write_scorecard(f'Time to calc target ORC: {rt}')
-    update_orc_and_weights_iter(distance_matrix, source_graph, target_graph, iteration=0, verbose=verbose)
-    
-    now = time.time()
-    rt = now-start
-    write_scorecard(f'Time to calc source ORC: {rt}')
-    
-    total_iterations = 200
-    for i in range(1, total_iterations + 1):
-        print('Working on itteration', i)
-        distance_matrix_i = source_graph.floyd_warshall()
-                
-        update_orc_and_weights_iter(distance_matrix_i, source_graph, target_graph, iteration=i, verbose=verbose)
-        now = time.time()
-        rt = now-start
-        write_scorecard(f'Time for ORC {i}: {rt}')
-        
-        allstable = True
-        finustab = None
-        if i == 1: 
-            #TODO: fix this weirdness
-            # take care of the getting started case
-            continue
-        errorlist = []
-        for e in source_graph.hyperedges:
-            clist = source_graph.ricci_curvature[e]
-            old = clist[-2]
-            new = clist[-1]
-            if old != 0:
-                error = abs((old-new)/old)
-            else: 
-                error = abs(old-new)
-            if error > 0.05:
-                # if verbose:
-                print('unstable for edge ', e, ' with error ', error)
-                finustab = e
-                allstable = False
-                break
-            # errorlist.append(error)
-        # if np.average(errorlist) > 0.03:
-            # if verbose:
-            # print('average error too high with error average of: ', np.average(errorlist))
-        else:
-        # if allstable:
-            print('STABILIZED! Source to target distance is ',i)
-            write_scorecard('\n\n----- Results -----')
-            write_scorecard(f'Source to target distance is {i}')
-            break
-    
-    if not allstable:
-        # print(target_graph.weights)
-        write_scorecard('Source to target did not stablize.')
-        print(source_graph.weights[finustab])
-        
-    now = time.time()
-    rt = now-start
-    write_scorecard(f'Time for source->target: {rt}')
-    
+    clock_time('Time to analyze graphs')
+     
+    one_direction_of_work(source_graph1, target_graph1, 200)  
+  
+    clock_time('Time for source->target')
+
     # Go the other way
     print('Now checking Target to Source....')
     if directed_flag:
-        source_graph = DirectedHypergraph()
-        target_graph = DirectedHypergraph()
+        source_graph1 = DirectedHypergraph()
+        target_graph1 = DirectedHypergraph()
     else:
-        source_graph = UndirectedHypergraph()
-        target_graph = UndirectedHypergraph()          
+        source_graph1 = UndirectedHypergraph()
+        target_graph1 = UndirectedHypergraph()          
     
     # swap them
     print('building source')
-    source_graph.build_from_dataframe(data_target, verbose)
+    source_graph1.build_from_dataframe(data_target, verbose)
     print('building target')
-    target_graph.build_from_dataframe(data_source, verbose)
+    target_graph1.build_from_dataframe(data_source, verbose)
         
-    distance_matrix = source_graph.floyd_warshall()    
-    target_distance_matrix = target_graph.floyd_warshall()
-    
-    if set(target_graph.hyperedges) != set(source_graph.hyperedges):
-        print ('Taking care of missing edges')
-        # add edges that are in the target but not the source
-        source_graph.add_missing_target_edges(target_graph, target_distance_matrix, verbose)
-        target_graph.add_missing_source_edges(source_graph, verbose)
-    
-    # print(source_graph.hyperedges)
-    calculate_target_orc(target_distance_matrix, target_graph, verbose, op_flag=True)
-    update_orc_and_weights_iter(distance_matrix, source_graph, target_graph, iteration=0, verbose=verbose, op_flag=True)
-    # verbose = True
-    for i in range(1, total_iterations + 1):
-        print('Working on itteration', i)
-        distance_matrix_i = source_graph.floyd_warshall()
-        update_orc_and_weights_iter(distance_matrix_i, source_graph, target_graph, iteration=i, verbose=False, op_flag=True)
-        now = time.time()
-        rt = now-start
-        write_scorecard(f'Time for ORC {i}: {rt}')
-        
-        allstable = True
-        finustab = None
-        if i == 1: # take care of the getting started case
-            continue
-        errorlist = []
-        for e in source_graph.hyperedges:
-            clist = source_graph.ricci_curvature[e]
-            old = clist[-2]
-            new = clist[-1]
-            # error = abs(old-new)
-            if old != 0:
-                error = abs((old-new)/old)
-            else: error = abs(old-new)
-            if error > 0.05:
-                # if verbose:
-                print('unstable for edge ', e, ' with error ', error)
-                finustab = e
-                allstable = False
-                break
-            # errorlist.append(error)
-        # if np.average(errorlist) > 0.03:
-            # if verbose:
-            # print('average error too high with error average of: ', np.average(errorlist))
-        # if allstable:
-        else:
-            print('STABILIZED! Target to source distance is ',i)
-            write_scorecard('\n\n----- Results -----')
-            write_scorecard(f'Target to source distance is {i}')
-            break
-            
-    if not allstable:
-        # print(target_graph.weights)
-        write_scorecard('Target to source did not stablize.')
-        print(source_graph.weights[finustab])
-        
-    now = time.time()
-    rt = now-start
-    write_scorecard(f'Time for final: {rt}')
-    
+    one_direction_of_work(source_graph1, target_graph1)
+      
+    clock_time('Time for final')
+   
