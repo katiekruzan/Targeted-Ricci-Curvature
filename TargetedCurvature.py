@@ -925,7 +925,7 @@ if __name__ == "__main__":
     '''
     start = time.time()
     target_filename = 'ERgraph100nodep4.csv'
-    source_filename = 'ERgraph100n5changev4.csv'
+    source_filename = 'ERgraph100n5changev3.csv'
     
     data_target = pd.read_csv(f'inputfiles/{target_filename}', dtype ={'source': str, 'target':str}, sep=',')  
     data_source = pd.read_csv(f'inputfiles/{source_filename}', dtype ={'source': str, 'target':str}, sep=',')  
@@ -1044,22 +1044,20 @@ if __name__ == "__main__":
         finustab = None
         if i == 1: # take care of the getting started case
             continue
+        errorlist = []
         for e in source_graph.hyperedges:
             clist = source_graph.ricci_curvature[e]
             old = clist[-2]
             new = clist[-1]
-            # print(e, old, new)
             if old != 0:
-                # error = abs((old-new)/old)
-                error = abs(old-new)
+                error = abs((old-new)/old)
             else: error = abs(old-new)
-            if error > 0.01:
-                # if verbose:
-                print('unstable for edge ', e, ' with error ', error)
-                finustab = e
-                allstable = False
-                break
-        if allstable:
+            errorlist.append(error)
+        if np.average(errorlist) > 0.03:
+            # if verbose:
+            print('average error too high with error average of: ', np.average(errorlist))
+        else:
+        # if allstable:
             print('STABILIZED! Source to target distance is ',i)
             write_scorecard('\n\n----- Results -----')
             write_scorecard(f'Source to target distance is {i}')
@@ -1074,7 +1072,6 @@ if __name__ == "__main__":
     rt = now-start
     write_scorecard(f'Time for source->target: {rt}')
     
-    # quit()
     # Go the other way
     print('Now checking Target to Source....')
     if directed_flag:
@@ -1115,19 +1112,28 @@ if __name__ == "__main__":
         finustab = None
         if i == 1: # take care of the getting started case
             continue
+        errorlist = []
         for e in source_graph.hyperedges:
             clist = source_graph.ricci_curvature[e]
             old = clist[-2]
             new = clist[-1]
             # error = abs((old-new)/old) #error as a percentage of old
-            error = abs(old-new)
-            if error > 0.01:
-                # if verbose:
-                print('unstable for edge ', e, ' with error ', error)
-                finustab = e
-                allstable = False
-                break
-        if allstable:
+            # error = abs(old-new)
+            if old != 0:
+                error = abs((old-new)/old)
+            else: error = abs(old-new)
+            # if error > 0.01:
+            #     # if verbose:
+            #     print('unstable for edge ', e, ' with error ', error)
+            #     finustab = e
+            #     allstable = False
+            #     break
+            errorlist.append(error)
+        if np.average(errorlist) > 0.03:
+            # if verbose:
+            print('average error too high with error average of: ', np.average(errorlist))
+        # if allstable:
+        else:
             print('STABILIZED! Target to source distance is ',i)
             write_scorecard('\n\n----- Results -----')
             write_scorecard(f'Target to source distance is {i}')
