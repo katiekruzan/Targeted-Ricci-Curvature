@@ -1,7 +1,3 @@
-'''
-Idea: do a hypergraph and then subclasses
-'''
-
 import pandas as pd
 import csv
 import numpy as np
@@ -462,11 +458,7 @@ class UndirectedHypergraph(Hypergraph):
         This buddy gets the average EMD across the whole edge
         :param hyperedge_id: The identifier for the hyperedge.
         :return: The average EMD for all permutations of node pairs, or None if the hyperedge does not exist or has errors.
-        """
-        # now = time.time()
-        # rt = now-start
-        # write_scorecard(f'\t\tAt earthmover_..._combinations {hyperedge_id} at time {rt}')
-                
+        """    
         if hyperedge_id not in self.hyperedges:
             print(f"Hyperedge {hyperedge_id} does not exist.")
             return None
@@ -710,11 +702,7 @@ class DirectedHypergraph(Hypergraph):
             for y in mu_B:
                 model.addConstr(quicksum(variables[x, y] for x in mu_A) == mu_B[y], f"dirt_filling_{y}")
 
-            # start_time = time.time()
             model.optimize()
-            # end_time = time.time()
-
-            # time_taken = end_time - start_time
 
             if model.status == GRB.OPTIMAL:
                 total_cost = model.getObjective().getValue()
@@ -773,16 +761,10 @@ def update_orc_and_weights_iter(distance_matrix:list[list], graph:Hypergraph, ta
                 writer.writerow(['Hyperedge ID', 'ORC: (based on t-1 weights)', 'Weight:t'])
             
             for hyperedge_id in graph.hyperedges:
-                # now = time.time()
-                # rt = now-start
-                # write_scorecard(f'\tStarted processing {hyperedge_id} at time {rt}')
                 # TODO: Figure out the difference in Directed//Undirected
                 if isinstance(graph, UndirectedHypergraph):
                     orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose=verbose)
                 # Normalize the curvature
-                # now = time.time()
-                # rt = now-start
-                # write_scorecard(f'\tTime to finish calculation ORC for hyperedge {hyperedge_id}: {rt}')
                 normalized_orc = ricci_normalizing(orc)
                 # un-normalizing
                 # normalized_orc = orc
