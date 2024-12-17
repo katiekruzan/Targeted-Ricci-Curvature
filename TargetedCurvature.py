@@ -777,7 +777,7 @@ def update_orc_and_weights_iter(distance_matrix:list[list], graph:Hypergraph, ta
                     
                     if weight != 0:
                         #simple version
-                        step = 1
+                        step = 2
                         wtplus1 = weight*(1  - step*(normalized_orc - orc_targ))
                         normalized_weight = wtplus1
                     else:
@@ -858,6 +858,7 @@ def clean_output(verbose:bool) -> None:
                 print(f'Had issues moving {f} to a new folder')
     return
 
+
 def write_scorecard(line:str)-> None:
     '''function used to write the key results to a scorecard (for posterity)
 
@@ -866,14 +867,25 @@ def write_scorecard(line:str)-> None:
     with open('outputfiles/scorecard.txt', 'a+') as f:
         f.write(line)
         f.write('\n')
+
         
 def clock_time(message:str)-> None:
+    '''Get the time from the start of the process and write it to the scorecard with some message
+
+    :param str message: The message to put before the time being spent
+    '''
     now = time.time()
     rt = now-start
     write_scorecard(f'{message}: {rt}')
     return
+
         
-def early_analysis(src_graph, verbose):
+def early_analysis(src_graph:Hypergraph, verbose:bool):
+    '''Get the information on the graph we're working on
+
+    :param Hypergraph src_graph: The graph we're analyzing
+    :param bool verbose: verbose flag
+    '''
     connected = src_graph.is_weakly_connected()
     max_degree, min_degree, avg_degree = src_graph.calculate_degrees()
 
@@ -900,8 +912,15 @@ def early_analysis(src_graph, verbose):
     write_scorecard(f"Min Degree: {min_degree}")
     write_scorecard(f"Average Degree: {avg_degree}")
     return
+
         
 def one_direction_of_work(src_graph:Hypergraph, targ_graph:Hypergraph, tot_its = 100):
+    '''Find out if one direction converges from source to target
+
+    :param Hypergraph src_graph: The source graph
+    :param Hypergraph targ_graph: The target graph
+    :param int tot_its: the maximum number of steps it can take, defaults to 100
+    '''
     print('working on distance matrices')
     distance_matrix = src_graph.floyd_warshall()
     save_matrix_csv(distance_matrix, 'outputfiles/undirected_source_dist_fw.csv')
@@ -978,7 +997,7 @@ def one_direction_of_work(src_graph:Hypergraph, targ_graph:Hypergraph, tot_its =
   
 if __name__ == "__main__": 
     # TODO: implement Ricci for Directed
-    # Check if the ratio of the weights is more or less tha same 
+    # Check if the ratio of the ORC is more or less tha same 
     # average absolute difference and see if that's small
     # try a network such that the sum of the two weights are the same
 
@@ -1012,47 +1031,49 @@ if __name__ == "__main__":
     clock_time('Time to read the data in seconds')
   
     if directed_flag:
-        source_graph1 = DirectedHypergraph()
-        target_graph1 = DirectedHypergraph()
+        source_graph = DirectedHypergraph()
+        target_graph = DirectedHypergraph()
     else:
-        source_graph1 = UndirectedHypergraph()
-        target_graph1 = UndirectedHypergraph()        
+        source_graph = UndirectedHypergraph()
+        target_graph = UndirectedHypergraph()        
           
     print('building source')          
-    source_graph1.build_from_dataframe(data_source, verbose)
+    source_graph.build_from_dataframe(data_source, verbose)
     print('building target')
-    target_graph1.build_from_dataframe(data_target, verbose)
+    target_graph.build_from_dataframe(data_target, verbose)
     
     clock_time('Time to build the graphs')
     
-    if not (source_graph1.is_2_uniform() and target_graph1.is_2_uniform()) :
+    if not (source_graph.is_2_uniform() and target_graph.is_2_uniform()) :
         print('This has not been fully fleshed out for hypergraphs. Please give a 2-uniform graph')
         quit()
     
-    early_analysis(source_graph1, verbose)
+    early_analysis(source_graph, verbose)
          
     clock_time('Time to analyze graphs')
      
-    one_direction_of_work(source_graph1, target_graph1, 200)  
+    one_direction_of_work(source_graph, target_graph, tot_its=100)  
   
     clock_time('Time for source->target')
+    
+    write_scorecard('\n')
 
     # Go the other way
     print('Now checking Target to Source....')
     if directed_flag:
-        source_graph1 = DirectedHypergraph()
-        target_graph1 = DirectedHypergraph()
+        source_graph = DirectedHypergraph()
+        target_graph = DirectedHypergraph()
     else:
-        source_graph1 = UndirectedHypergraph()
-        target_graph1 = UndirectedHypergraph()          
+        source_graph = UndirectedHypergraph()
+        target_graph = UndirectedHypergraph()          
     
     # swap them
     print('building source')
-    source_graph1.build_from_dataframe(data_target, verbose)
+    source_graph.build_from_dataframe(data_target, verbose)
     print('building target')
-    target_graph1.build_from_dataframe(data_source, verbose)
+    target_graph.build_from_dataframe(data_source, verbose)
         
-    one_direction_of_work(source_graph1, target_graph1)
+    one_direction_of_work(source_graph, target_graph, tot_its=100)
       
     clock_time('Time for final')
    
