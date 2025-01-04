@@ -1017,8 +1017,8 @@ if __name__ == "__main__":
     # TODO: Also check out the directed graphs
     '''
     start = time.time()
-    target_filename = 'ERgraph100nodep4.csv'
-    source_filename = 'ERgraph100n5changev3.csv'
+    target_filename = 'petersen/petersengraph.csv'
+    source_filename = 'petersen/petersengraph_newbigweights.csv'
     
     data_target = pd.read_csv(f'inputfiles/{target_filename}', dtype ={'source': str, 'target':str}, sep=',')  
     data_source = pd.read_csv(f'inputfiles/{source_filename}', dtype ={'source': str, 'target':str}, sep=',')  
