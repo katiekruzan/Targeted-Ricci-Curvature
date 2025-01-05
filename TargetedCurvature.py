@@ -472,91 +472,6 @@ class UndirectedHypergraph(Hypergraph):
         
         return probability_distribution
     
-    # def earthmover_distance_gurobi_distance_matrix(self, node_A, node_B, distance_matrix, verbose):        
-    #     if node_A not in self.nodes or node_B not in self.nodes:
-    #         print(f"Node {node_A} or {node_B} does not exist in the hypergraph.")
-    #         return None  # Return None if either node does not exist
-        
-    #     # Get the probability distributions for the two specified nodes.
-    #     mu_A = self.node_probability(node_A)
-    #     mu_B = self.node_probability(node_B)
-    #     if verbose:
-    #         print('The node', node_A, 'has distribution', mu_A)
-    #         print('The node', node_B, 'has distribution', mu_B)
-
-    #     # Convert distributions from dictionary to list format 
-    #     nodes_A = sorted(mu_A.keys())
-    #     nodes_B = sorted(mu_B.keys())
-    #     distribution1 = [mu_A[node] for node in nodes_A]
-    #     distribution2 = [mu_B[node] for node in nodes_B]
-
-    #     # Check if distributions sum to the same value
-    #     total_mass_A = sum(distribution1)
-    #     total_mass_B = sum(distribution2)
-    #     if verbose:
-    #         print(f'mass for {node_A} is {total_mass_A} and mass for {node_B} is {total_mass_B}')
-    
-    #     if abs(total_mass_A - total_mass_B) > 1e-6:
-    #         raise ValueError('The total mass of the distributions mu_A and mu_B are not equal.')
-
-    #     # Create a mapping of nodes to their indices in the distance matrix.
-    #     node_to_index = self.node_index
-
-    #     try:
-    #         # Create a new model in Gurobi.
-    #         model = Model("EarthMoverDistance")
-    #         # Set up the log file
-    #         # log_filename = f"gurobi_log_{node_A}_to_{node_B}.log"
-    #         # Set up the log file
-    #         # '''
-    #         # log_filename = f"gurobi_log_{hyperedge_id}.log"
-    #         # model.setParam('LogFile', log_filename)
-    #         # '''
-    #         #model.setParam('OutputFlag', 1)
-    #         # Create variables for the linear program.
-    #         variables = model.addVars(mu_A.keys(), mu_B.keys(), name="z", lb=0)           
-    #         # Should make it less verbose
-    #         # if verbose:
-    #         #     print('boop')
-    #         #     model.Params.LogToConsole = 1
-    #         # else:
-    #         model.Params.LogToConsole = 0
-            
-    #         expr = LinExpr(3.0)
-    #         expr.clear()
-    #         for x in mu_A:
-    #             for y in mu_B:
-    #                 expr.addTerms(distance_matrix[node_to_index[x]][node_to_index[y]], variables[x,y])
-            
-    #         # Set the objective of the linear program to minimize the total cost.
-    #         model.setObjective(expr, GRB.MINIMIZE)
-
-    #         # Add constraints to ensure the conservation of mass.
-    #         for x in mu_A:
-    #             model.addConstr(quicksum(variables[x, y] for y in mu_B) == mu_A[x], f"dirt_leaving_{x}")
-
-    #         for y in mu_B:
-    #             model.addConstr(quicksum(variables[x, y] for x in mu_A) == mu_B[y], f"dirt_filling_{y}")
-            
-    #         # Start the timer, solve the model, and calculate the time taken.
-    #         model.optimize()
-
-    #         # Check the model status and process the results.
-    #         if model.status == GRB.OPTIMAL:
-    #             total_cost = model.getObjective().getValue()
-    #             return total_cost
-    #         else:
-    #             print(f"No optimal solution found for nodes {node_A} and {node_B}")
-    #             print(f"The probability distributions are A: {mu_A} \nAnd B: {mu_B}")
-    #             print('Model Status', model.status)
-    #             print(f"The masses are {total_mass_A} for A and {total_mass_B} for B")
-    #             return None
-
-    #     except Exception as e:
-    #         print(f"Gurobi Error: {e}\n for nodes {node_A} and {node_B}")
-    #         return None
-    
-    
     def earthmover_distance_hyperedge_combinations(self, hyperedge_id:str, distance_matrix:list[list], verbose:bool):
         """
         This buddy gets the average EMD across the whole edge
@@ -752,90 +667,6 @@ class DirectedHypergraph(Hypergraph):
         return mu_A_in, mu_B_out
     
     
-    # def earthmover_distance_gurobi_distance_matrix(self, hyperedge_id, distance_matrix, verbose):
-    #     '''Function to calculate EMD using the distance matrix (Optimized)'''
-    #     #TODO: think of how to combine these for undirected//directed. Most of this is the exact same.
-    #     # NOTE: preeeeeetty sure this works. Might be nice to double check, but it should be fine
-    #     # seems directed does the combinations in the calculate probability distributions section
-    #     # Get the probability distributions for the specified hyperedge.
-    #     mu_A, mu_B = self.calculate_probability_distributions(hyperedge_id)
-
-    #     # Convert distributions from dictionary to list format and print for debugging
-    #     nodes_A = sorted(mu_A.keys())
-    #     nodes_B = sorted(mu_B.keys())
-    #     distribution1 = [mu_A[node] for node in nodes_A]
-    #     distribution2 = [mu_B[node] for node in nodes_B]
-    
-    #     # Print the distributions to verify correctness
-    #     if verbose:
-    #         print("Nodes in mu_A:", nodes_A)
-    #         print("Nodes in mu_B:", nodes_B)
-    #         print("Distribution mu_A:", distribution1)
-    #         print("Distribution mu_B:", distribution2)
-
-    #     # Check if distributions sum to the same value
-    #     total_mass_A = sum(distribution1)
-    #     total_mass_B = sum(distribution2)
-    #     if verbose:
-    #         print("Total mass in mu_A:", total_mass_A)
-    #         print("Total mass in mu_B:", total_mass_B)
-        
-    #     if abs(total_mass_A - total_mass_B) > 1e-6:
-    #         raise ValueError('The total mass of the distributions mu_A and mu_B are not equal.')
-        
-
-    #     # Create a mapping of nodes to their indices in the distance matrix.
-    #     node_to_index = self.node_index
-        
-    #     try:
-    #         model = Model("EarthMoverDistance")
-
-    #         # Set up the log file
-    #         # log_filename = f"gurobi_log_{hyperedge_id}.log"
-    #         # model.setParam('LogFile', log_filename)
-
-    #         variables = model.addVars(mu_A.keys(), mu_B.keys(), name="z", lb=0)
-            
-    #         # Should make it less verbose
-    #         if not verbose:
-    #             model.Params.LogToConsole = 0
-
-    #         # Update the objective function to use the distance matrix.
-    #         model.setObjective(quicksum(distance_matrix[node_to_index[x]][node_to_index[y]] * variables[x, y]
-    #                             for x in mu_A for y in mu_B), GRB.MINIMIZE)
-
-    #         # Add constraints
-    #         for x in mu_A:
-    #             model.addConstr(quicksum(variables[x, y] for y in mu_B) == mu_A[x], f"dirt_leaving_{x}")
-
-    #         for y in mu_B:
-    #             model.addConstr(quicksum(variables[x, y] for x in mu_A) == mu_B[y], f"dirt_filling_{y}")
-
-    #         model.optimize()
-
-    #         if model.status == GRB.OPTIMAL:
-    #             total_cost = model.getObjective().getValue()
-    #             if verbose:
-    #                 print("Total EMD Cost:", total_cost)
-
-    #                 for x in mu_A:
-    #                     for y in mu_B:
-    #                         amount_moved = variables[x, y].X
-    #                         if amount_moved > 0:
-    #                             print(f"Move {amount_moved} from {x} to {y}")
-    #             return total_cost
-    #         else:
-    #             print(f"No optimal solution found for nodes {nodes_A} and {nodes_B}")
-    #             print(f"The probability distributions are A: {mu_A} \nAnd B: {mu_B}")
-    #             print('Model Status', model.status)
-    #             print(f"The masses are {total_mass_A} for A and {total_mass_B} for B")
-    #             return None
-            
-    #     except Exception as e:
-    #         print(f"Gurobi Error: {e}\n for hyperedge {hyperedge_id}")
-    #         return None    
-    
-    
 def save_matrix_csv(matrix:list[list], filename:str) -> None:
     '''Function to save the matrix as a CSV file
 
@@ -870,7 +701,6 @@ def update_orc_and_weights_iter(distance_matrix:list[list], graph:Hypergraph, ta
                 writer.writerow(['Hyperedge ID', 'ORC: (based on t-1 weights)', 'Weight:t'])
             
             for hyperedge_id in graph.hyperedges:
-                # TODO: Figure out the difference in Directed//Undirected
                 if isinstance(graph, UndirectedHypergraph):
                     orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose=verbose)
                 elif isinstance(graph, DirectedHypergraph): # We're a directed graph
@@ -1116,7 +946,6 @@ def one_direction_of_work(src_graph:Hypergraph, targ_graph:Hypergraph, tot_its =
     
   
 if __name__ == "__main__": 
-    # TODO: implement Ricci for Directed
     # Check if the ratio of the ORC is more or less tha same 
     # average absolute difference and see if that's small
     # try a network such that the sum of the two weights are the same
@@ -1133,8 +962,6 @@ if __name__ == "__main__":
     The data needs to come in as a csv with three columns labeled 'source', 'target', and 'weight'
     This will be read as a pandas dataframe. 
     And the nodes must be labeled the same in both graphs for this to work
-    
-    # TODO: Also check out the directed graphs
     '''
     start = time.time()
     target_filename = 'petersen/petersengraph.csv'
