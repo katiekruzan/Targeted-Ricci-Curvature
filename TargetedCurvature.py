@@ -181,6 +181,112 @@ class Hypergraph:
             avg_degree = np.average(degrees, axis=0)
         
         return max_degree, min_degree, avg_degree
+    
+    def earthmover_distance_gurobi_distance_matrix(self, data, distance_matrix, verbose):
+        '''Trying to combine the two functions into one
+
+        :param _type_ data: _description_
+        :param _type_ distance_matrix: _description_
+        :param _type_ verbose: _description_
+        :raises this: _description_
+        :raises ValueError: _description_
+        :raises ValueError: _description_
+        :raises ValueError: _description_
+        :raises ValueError: _description_
+        :raises ValueError: _description_
+        :raises ValueError: _description_
+        :return _type_: _description_
+        '''
+        # error handling
+        if isinstance(self, UndirectedHypergraph):
+            # check data is node A node B
+            node_A, node_B = data
+            if node_A not in self.nodes or node_B not in self.nodes:
+                print(f"Node {node_A} or {node_B} does not exist in the Undirected hypergraph.")
+                return None  # Return None if either node does not exist
+            mu_A = self.node_probability(node_A)
+            mu_B = self.node_probability(node_B)
+        elif isinstance(self, DirectedHypergraph):
+            # check data is a hyperedge_id
+            hyperedge_id = data 
+            if hyperedge_id not in self.hyperedges:
+                print(f"Edge {hyperedge_id} does not exist in the Directed hypergraph.")
+                return None  # Return None if edge does not exist
+            mu_A, mu_B = self.calculate_probability_distributions(hyperedge_id)
+        
+        # Convert distributions from dictionary to list format and print for debugging
+        nodes_A = sorted(mu_A.keys())
+        nodes_B = sorted(mu_B.keys())
+        distribution1 = [mu_A[node] for node in nodes_A]
+        distribution2 = [mu_B[node] for node in nodes_B]
+        
+        # Print the distributions to verify correctness
+        if verbose:
+            print("Nodes in mu_A:", nodes_A)
+            print("Nodes in mu_B:", nodes_B)
+            print("Distribution mu_A:", distribution1)
+            print("Distribution mu_B:", distribution2)
+            
+        # Check if distributions sum to the same value
+        total_mass_A = sum(distribution1)
+        total_mass_B = sum(distribution2)
+        if verbose:
+            print("Total mass in mu_A:", total_mass_A)
+            print("Total mass in mu_B:", total_mass_B)
+        
+        if abs(total_mass_A - total_mass_B) > 1e-6:
+            raise ValueError('The total mass of the distributions mu_A and mu_B are not equal.')
+        
+        # Create a mapping of nodes to their indices in the distance matrix.
+        node_to_index = self.node_index
+        
+        try:
+            # Create a new model in Gurobi.
+            model = Model("EarthMoverDistance")
+            
+            # Set up the log file
+            # log_filename = f"gurobi_log_{data}.log"
+            # model.setParam('LogFile', log_filename)
+            
+            # Create variables for the linear program.
+            variables = model.addVars(mu_A.keys(), mu_B.keys(), name="z", lb=0) 
+            
+            # Make it less verbose
+            model.Params.LogToConsole = 0          
+            
+            expr = LinExpr(3.0)
+            expr.clear()
+            for x in mu_A:
+                for y in mu_B:
+                    expr.addTerms(distance_matrix[node_to_index[x]][node_to_index[y]], variables[x,y])
+            
+            # Set the objective of the linear program to minimize the total cost.
+            model.setObjective(expr, GRB.MINIMIZE)
+            
+            # Add constraints to ensure the conservation of mass.
+            for x in mu_A:
+                model.addConstr(quicksum(variables[x, y] for y in mu_B) == mu_A[x], f"dirt_leaving_{x}")
+
+            for y in mu_B:
+                model.addConstr(quicksum(variables[x, y] for x in mu_A) == mu_B[y], f"dirt_filling_{y}")
+            
+            # Start the timer, solve the model, and calculate the time taken.
+            model.optimize()
+            
+            # Check the model status and process the results.
+            if model.status == GRB.OPTIMAL:
+                total_cost = model.getObjective().getValue()
+                return total_cost
+            else:
+                print(f"No optimal solution found for data {data}")
+                print(f"The probability distributions are A: {mu_A} \nAnd B: {mu_B}")
+                print('Model Status', model.status)
+                print(f"The masses are {total_mass_A} for A and {total_mass_B} for B")
+                return None
+            
+        except Exception as e:
+            print(f"Gurobi Error: {e}\n for data {data}")
+            return None 
 
 
 class UndirectedHypergraph(Hypergraph):
@@ -366,90 +472,89 @@ class UndirectedHypergraph(Hypergraph):
         
         return probability_distribution
     
-    
-    def earthmover_distance_gurobi_distance_matrix(self, node_A, node_B, distance_matrix, verbose):        
-        if node_A not in self.nodes or node_B not in self.nodes:
-            print(f"Node {node_A} or {node_B} does not exist in the hypergraph.")
-            return None  # Return None if either node does not exist
+    # def earthmover_distance_gurobi_distance_matrix(self, node_A, node_B, distance_matrix, verbose):        
+    #     if node_A not in self.nodes or node_B not in self.nodes:
+    #         print(f"Node {node_A} or {node_B} does not exist in the hypergraph.")
+    #         return None  # Return None if either node does not exist
         
-        # Get the probability distributions for the two specified nodes.
-        mu_A = self.node_probability(node_A)
-        mu_B = self.node_probability(node_B)
-        if verbose:
-            print('The node', node_A, 'has distribution', mu_A)
-            print('The node', node_B, 'has distribution', mu_B)
+    #     # Get the probability distributions for the two specified nodes.
+    #     mu_A = self.node_probability(node_A)
+    #     mu_B = self.node_probability(node_B)
+    #     if verbose:
+    #         print('The node', node_A, 'has distribution', mu_A)
+    #         print('The node', node_B, 'has distribution', mu_B)
 
-        # Convert distributions from dictionary to list format 
-        nodes_A = sorted(mu_A.keys())
-        nodes_B = sorted(mu_B.keys())
-        distribution1 = [mu_A[node] for node in nodes_A]
-        distribution2 = [mu_B[node] for node in nodes_B]
+    #     # Convert distributions from dictionary to list format 
+    #     nodes_A = sorted(mu_A.keys())
+    #     nodes_B = sorted(mu_B.keys())
+    #     distribution1 = [mu_A[node] for node in nodes_A]
+    #     distribution2 = [mu_B[node] for node in nodes_B]
 
-        # Check if distributions sum to the same value
-        total_mass_A = sum(distribution1)
-        total_mass_B = sum(distribution2)
-        if verbose:
-            print(f'mass for {node_A} is {total_mass_A} and mass for {node_B} is {total_mass_B}')
+    #     # Check if distributions sum to the same value
+    #     total_mass_A = sum(distribution1)
+    #     total_mass_B = sum(distribution2)
+    #     if verbose:
+    #         print(f'mass for {node_A} is {total_mass_A} and mass for {node_B} is {total_mass_B}')
     
-        if abs(total_mass_A - total_mass_B) > 1e-6:
-            raise ValueError('The total mass of the distributions mu_A and mu_B are not equal.')
+    #     if abs(total_mass_A - total_mass_B) > 1e-6:
+    #         raise ValueError('The total mass of the distributions mu_A and mu_B are not equal.')
 
-        # Create a mapping of nodes to their indices in the distance matrix.
-        node_to_index = self.node_index
+    #     # Create a mapping of nodes to their indices in the distance matrix.
+    #     node_to_index = self.node_index
 
-        try:
-            # Create a new model in Gurobi.
-            model = Model("EarthMoverDistance")
-            # Set up the log file
-            # log_filename = f"gurobi_log_{node_A}_to_{node_B}.log"
-            # Set up the log file
-            # '''
-            # log_filename = f"gurobi_log_{hyperedge_id}.log"
-            # model.setParam('LogFile', log_filename)
-            # '''
-            #model.setParam('OutputFlag', 1)
-            # Create variables for the linear program.
-            variables = model.addVars(mu_A.keys(), mu_B.keys(), name="z", lb=0)           
-            # Should make it less verbose
-            # if verbose:
-            #     print('boop')
-            #     model.Params.LogToConsole = 1
-            # else:
-            model.Params.LogToConsole = 0
+    #     try:
+    #         # Create a new model in Gurobi.
+    #         model = Model("EarthMoverDistance")
+    #         # Set up the log file
+    #         # log_filename = f"gurobi_log_{node_A}_to_{node_B}.log"
+    #         # Set up the log file
+    #         # '''
+    #         # log_filename = f"gurobi_log_{hyperedge_id}.log"
+    #         # model.setParam('LogFile', log_filename)
+    #         # '''
+    #         #model.setParam('OutputFlag', 1)
+    #         # Create variables for the linear program.
+    #         variables = model.addVars(mu_A.keys(), mu_B.keys(), name="z", lb=0)           
+    #         # Should make it less verbose
+    #         # if verbose:
+    #         #     print('boop')
+    #         #     model.Params.LogToConsole = 1
+    #         # else:
+    #         model.Params.LogToConsole = 0
             
-            expr = LinExpr(3.0)
-            expr.clear()
-            for x in mu_A:
-                for y in mu_B:
-                    expr.addTerms(distance_matrix[node_to_index[x]][node_to_index[y]], variables[x,y])
+    #         expr = LinExpr(3.0)
+    #         expr.clear()
+    #         for x in mu_A:
+    #             for y in mu_B:
+    #                 expr.addTerms(distance_matrix[node_to_index[x]][node_to_index[y]], variables[x,y])
             
-            # Set the objective of the linear program to minimize the total cost.
-            model.setObjective(expr, GRB.MINIMIZE)
+    #         # Set the objective of the linear program to minimize the total cost.
+    #         model.setObjective(expr, GRB.MINIMIZE)
 
-            # Add constraints to ensure the conservation of mass.
-            for x in mu_A:
-                model.addConstr(quicksum(variables[x, y] for y in mu_B) == mu_A[x], f"dirt_leaving_{x}")
+    #         # Add constraints to ensure the conservation of mass.
+    #         for x in mu_A:
+    #             model.addConstr(quicksum(variables[x, y] for y in mu_B) == mu_A[x], f"dirt_leaving_{x}")
 
-            for y in mu_B:
-                model.addConstr(quicksum(variables[x, y] for x in mu_A) == mu_B[y], f"dirt_filling_{y}")
+    #         for y in mu_B:
+    #             model.addConstr(quicksum(variables[x, y] for x in mu_A) == mu_B[y], f"dirt_filling_{y}")
             
-            # Start the timer, solve the model, and calculate the time taken.
-            model.optimize()
+    #         # Start the timer, solve the model, and calculate the time taken.
+    #         model.optimize()
 
-            # Check the model status and process the results.
-            if model.status == GRB.OPTIMAL:
-                total_cost = model.getObjective().getValue()
-                return total_cost
-            else:
-                print(f"No optimal solution found for nodes {node_A} and {node_B}")
-                print(f"The probability distributions are A: {mu_A} \nAnd B: {mu_B}")
-                print('Model Status', model.status)
-                print(f"The masses are {total_mass_A} for A and {total_mass_B} for B")
-                return None
+    #         # Check the model status and process the results.
+    #         if model.status == GRB.OPTIMAL:
+    #             total_cost = model.getObjective().getValue()
+    #             return total_cost
+    #         else:
+    #             print(f"No optimal solution found for nodes {node_A} and {node_B}")
+    #             print(f"The probability distributions are A: {mu_A} \nAnd B: {mu_B}")
+    #             print('Model Status', model.status)
+    #             print(f"The masses are {total_mass_A} for A and {total_mass_B} for B")
+    #             return None
 
-        except Exception as e:
-            print(f"Gurobi Error: {e}\n for nodes {node_A} and {node_B}")
-            return None
+    #     except Exception as e:
+    #         print(f"Gurobi Error: {e}\n for nodes {node_A} and {node_B}")
+    #         return None
     
     
     def earthmover_distance_hyperedge_combinations(self, hyperedge_id:str, distance_matrix:list[list], verbose:bool):
@@ -471,7 +576,7 @@ class UndirectedHypergraph(Hypergraph):
         pair_count = 0
         # Generate all combinations of pairs of nodes
         for node_A, node_B in combinations(nodes, 2):
-            emd = self.earthmover_distance_gurobi_distance_matrix(node_A, node_B, distance_matrix, verbose)
+            emd = self.earthmover_distance_gurobi_distance_matrix((node_A, node_B), distance_matrix, verbose)
             
             if emd is not None:
                 sum_emd += emd
@@ -574,7 +679,6 @@ class DirectedHypergraph(Hypergraph):
         
         d_in_x = 0
         d_out_x = 0
-        # TODO: double check this works
         for _, (tail_set, head_set) in self.hyperedges.items():
             if node in head_set:
                 d_in_x += 1
@@ -583,9 +687,12 @@ class DirectedHypergraph(Hypergraph):
         
         return [d_in_x, d_out_x]
     
-    def calculate_probability_distributions(self, hyperedge_id):
-        #TODO: double check for correctness
-        '''Function to calculate the probability distributions over all nodes based on the hyperedge'''
+    def calculate_probability_distributions(self, hyperedge_id:str):
+        '''Function to calculate the probability distributions over all nodes based on the hyperedge
+
+        :param str hyperedge_id: Name of the edge we're working with
+        :return _type_: _description_
+        '''
         tail_set, head_set = self.hyperedges[hyperedge_id]
 
         # Initialize mu_A and mu_B only for nodes in the tail set and head set respectively
@@ -593,15 +700,16 @@ class DirectedHypergraph(Hypergraph):
         mu_A_in = {node: 0 for node in self.nodes}
         for node in tail_set:
             d_x_in = self.node_degree(node)[0]
+            # print('in',node, d_x_in)
             if d_x_in != 0:
                 mu_A_in[node] = 0
             else:
                 mu_A_in[node] = 1 / len(tail_set)
-
        
         mu_B_out = {node: 0 for node in self.nodes}
         for node in head_set:
             d_x_out = self.node_degree(node)[1]
+            # print('out',node, d_x_out)
             if d_x_out != 0:
                 mu_B_out[node] = 0
             else:
@@ -644,88 +752,88 @@ class DirectedHypergraph(Hypergraph):
         return mu_A_in, mu_B_out
     
     
-    def earthmover_distance_gurobi_distance_matrix(self, hyperedge_id, distance_matrix, verbose):
-        '''Function to calculate EMD using the distance matrix (Optimized)'''
-        #TODO: think of how to combine these for undirected//directed. Most of this is the exact same.
-        # NOTE: preeeeeetty sure this works. Might be nice to double check, but it should be fine
-        # seems directed does the combinations in the calculate probability distributions section
-        # Get the probability distributions for the specified hyperedge.
-        mu_A, mu_B = self.calculate_probability_distributions(hyperedge_id)
+    # def earthmover_distance_gurobi_distance_matrix(self, hyperedge_id, distance_matrix, verbose):
+    #     '''Function to calculate EMD using the distance matrix (Optimized)'''
+    #     #TODO: think of how to combine these for undirected//directed. Most of this is the exact same.
+    #     # NOTE: preeeeeetty sure this works. Might be nice to double check, but it should be fine
+    #     # seems directed does the combinations in the calculate probability distributions section
+    #     # Get the probability distributions for the specified hyperedge.
+    #     mu_A, mu_B = self.calculate_probability_distributions(hyperedge_id)
 
-        # Convert distributions from dictionary to list format and print for debugging
-        nodes_A = sorted(mu_A.keys())
-        nodes_B = sorted(mu_B.keys())
-        distribution1 = [mu_A[node] for node in nodes_A]
-        distribution2 = [mu_B[node] for node in nodes_B]
+    #     # Convert distributions from dictionary to list format and print for debugging
+    #     nodes_A = sorted(mu_A.keys())
+    #     nodes_B = sorted(mu_B.keys())
+    #     distribution1 = [mu_A[node] for node in nodes_A]
+    #     distribution2 = [mu_B[node] for node in nodes_B]
     
-        # Print the distributions to verify correctness
-        if verbose:
-            print("Nodes in mu_A:", nodes_A)
-            print("Nodes in mu_B:", nodes_B)
-            print("Distribution mu_A:", distribution1)
-            print("Distribution mu_B:", distribution2)
+    #     # Print the distributions to verify correctness
+    #     if verbose:
+    #         print("Nodes in mu_A:", nodes_A)
+    #         print("Nodes in mu_B:", nodes_B)
+    #         print("Distribution mu_A:", distribution1)
+    #         print("Distribution mu_B:", distribution2)
 
-        # Check if distributions sum to the same value
-        total_mass_A = sum(distribution1)
-        total_mass_B = sum(distribution2)
-        if verbose:
-            print("Total mass in mu_A:", total_mass_A)
-            print("Total mass in mu_B:", total_mass_B)
-    
-        if abs(total_mass_A - total_mass_B) > 1e-6:
-            raise ValueError('The total mass of the distributions mu_A and mu_B are not equal.')
+    #     # Check if distributions sum to the same value
+    #     total_mass_A = sum(distribution1)
+    #     total_mass_B = sum(distribution2)
+    #     if verbose:
+    #         print("Total mass in mu_A:", total_mass_A)
+    #         print("Total mass in mu_B:", total_mass_B)
+        
+    #     if abs(total_mass_A - total_mass_B) > 1e-6:
+    #         raise ValueError('The total mass of the distributions mu_A and mu_B are not equal.')
         
 
-        # Create a mapping of nodes to their indices in the distance matrix.
-        node_to_index = self.node_index
+    #     # Create a mapping of nodes to their indices in the distance matrix.
+    #     node_to_index = self.node_index
         
-        try:
-            model = Model("EarthMoverDistance")
+    #     try:
+    #         model = Model("EarthMoverDistance")
 
-            # Set up the log file
-            # log_filename = f"gurobi_log_{hyperedge_id}.log"
-            # model.setParam('LogFile', log_filename)
+    #         # Set up the log file
+    #         # log_filename = f"gurobi_log_{hyperedge_id}.log"
+    #         # model.setParam('LogFile', log_filename)
 
-            variables = model.addVars(mu_A.keys(), mu_B.keys(), name="z", lb=0)
+    #         variables = model.addVars(mu_A.keys(), mu_B.keys(), name="z", lb=0)
             
-            # Should make it less verbose
-            if not verbose:
-                model.Params.LogToConsole = 0
+    #         # Should make it less verbose
+    #         if not verbose:
+    #             model.Params.LogToConsole = 0
 
-            # Update the objective function to use the distance matrix.
-            model.setObjective(quicksum(distance_matrix[node_to_index[x]][node_to_index[y]] * variables[x, y]
-                                for x in mu_A for y in mu_B), GRB.MINIMIZE)
+    #         # Update the objective function to use the distance matrix.
+    #         model.setObjective(quicksum(distance_matrix[node_to_index[x]][node_to_index[y]] * variables[x, y]
+    #                             for x in mu_A for y in mu_B), GRB.MINIMIZE)
 
-            # Add constraints
-            for x in mu_A:
-                model.addConstr(quicksum(variables[x, y] for y in mu_B) == mu_A[x], f"dirt_leaving_{x}")
+    #         # Add constraints
+    #         for x in mu_A:
+    #             model.addConstr(quicksum(variables[x, y] for y in mu_B) == mu_A[x], f"dirt_leaving_{x}")
 
-            for y in mu_B:
-                model.addConstr(quicksum(variables[x, y] for x in mu_A) == mu_B[y], f"dirt_filling_{y}")
+    #         for y in mu_B:
+    #             model.addConstr(quicksum(variables[x, y] for x in mu_A) == mu_B[y], f"dirt_filling_{y}")
 
-            model.optimize()
+    #         model.optimize()
 
-            if model.status == GRB.OPTIMAL:
-                total_cost = model.getObjective().getValue()
-                if verbose:
-                    print("Total EMD Cost:", total_cost)
+    #         if model.status == GRB.OPTIMAL:
+    #             total_cost = model.getObjective().getValue()
+    #             if verbose:
+    #                 print("Total EMD Cost:", total_cost)
 
-                    for x in mu_A:
-                        for y in mu_B:
-                            amount_moved = variables[x, y].X
-                            if amount_moved > 0:
-                                print(f"Move {amount_moved} from {x} to {y}")
-                return total_cost
-            else:
-                print(f"No optimal solution found for nodes {nodes_A} and {nodes_B}")
-                print(f"The probability distributions are A: {mu_A} \nAnd B: {mu_B}")
-                print('Model Status', model.status)
-                print(f"The masses are {total_mass_A} for A and {total_mass_B} for B")
-                return None
+    #                 for x in mu_A:
+    #                     for y in mu_B:
+    #                         amount_moved = variables[x, y].X
+    #                         if amount_moved > 0:
+    #                             print(f"Move {amount_moved} from {x} to {y}")
+    #             return total_cost
+    #         else:
+    #             print(f"No optimal solution found for nodes {nodes_A} and {nodes_B}")
+    #             print(f"The probability distributions are A: {mu_A} \nAnd B: {mu_B}")
+    #             print('Model Status', model.status)
+    #             print(f"The masses are {total_mass_A} for A and {total_mass_B} for B")
+    #             return None
             
-        except Exception as e:
-            print(f"Gurobi Error: {e}\n for hyperedge {hyperedge_id}")
-            return None    
+    #     except Exception as e:
+    #         print(f"Gurobi Error: {e}\n for hyperedge {hyperedge_id}")
+    #         return None    
     
     
 def save_matrix_csv(matrix:list[list], filename:str) -> None:
@@ -794,21 +902,20 @@ def update_orc_and_weights_iter(distance_matrix:list[list], graph:Hypergraph, ta
                     writer.writerow([hyperedge_id, normalized_orc, weight])
  
  
-def calculate_target_orc(distance_matrix: list[list], graph:Hypergraph, verbose:bool, file_format='csv', op_flag=False):
+def calculate_target_orc(distance_matrix: list[list], graph:Hypergraph, verbose:bool, op_flag=False):
     # Works for Directed
     '''The function to calculate the staring infor for the target graph
 
     :param list[list] distance_matrix: matrix of minimal distances from the floyd_warshall function
     :param Hypergraph graph: the actual source graph
     :param bool verbose: verbose flag
-    :param str file_format: defaults to 'csv'
     :param bool op_flag: option to mark the file as 'op' (used in second half of
                          script), defaults to False
     '''
     if op_flag:
-        file_name = f'outputfiles/op_dataset_target_graph_orc.{file_format}'
+        file_name = f'outputfiles/op_dataset_target_graph_orc.csv'
     else:
-        file_name = f'outputfiles/dataset_target_graph_orc.{file_format}'
+        file_name = f'outputfiles/dataset_target_graph_orc.csv'
     
     with open(file_name, 'a', newline='') as file:
         writer = csv.writer(file)
@@ -1014,7 +1121,7 @@ if __name__ == "__main__":
     # average absolute difference and see if that's small
     # try a network such that the sum of the two weights are the same
 
-    directed_flag = True
+    directed_flag = False
     verbose = False
      
     clean_output(verbose)
