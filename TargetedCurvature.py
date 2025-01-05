@@ -117,7 +117,6 @@ class Hypergraph:
         dist = [[float('inf') for _ in range(node_count)] for _ in range(node_count)]
         
         # Set the diagonal to 0 (distance from each node to itself) 
-        # TODO: See if this makes sense for directed
         for i in range(node_count):
             dist[i][i] = 0
         
@@ -497,6 +496,7 @@ class UndirectedHypergraph(Hypergraph):
     
   
 class DirectedHypergraph(Hypergraph):
+    #TODO: Doesn't work for non Strongly Connected right now. fix later.
     def add_hyperedge(self, hyperedge_id:str, tail_set:set, head_set:set, weight_list = [1], verbose=True) -> None:
         '''Function to add a hyperedge to the hypergraph, if the nodes are not 
         there, will add the nodes
@@ -647,6 +647,7 @@ class DirectedHypergraph(Hypergraph):
     def earthmover_distance_gurobi_distance_matrix(self, hyperedge_id, distance_matrix, verbose):
         '''Function to calculate EMD using the distance matrix (Optimized)'''
         #TODO: think of how to combine these for undirected//directed. Most of this is the exact same.
+        # NOTE: preeeeeetty sure this works. Might be nice to double check, but it should be fine
         # seems directed does the combinations in the calculate probability distributions section
         # Get the probability distributions for the specified hyperedge.
         mu_A, mu_B = self.calculate_probability_distributions(hyperedge_id)
@@ -706,14 +707,14 @@ class DirectedHypergraph(Hypergraph):
 
             if model.status == GRB.OPTIMAL:
                 total_cost = model.getObjective().getValue()
-                print("Total EMD Cost:", total_cost)
-                # print("Time taken to find the optimal solution: {:.4f} seconds".format(time_taken))
+                if verbose:
+                    print("Total EMD Cost:", total_cost)
 
-                for x in mu_A:
-                    for y in mu_B:
-                        amount_moved = variables[x, y].X
-                        if amount_moved > 0:
-                            print(f"Move {amount_moved} from {x} to {y}")
+                    for x in mu_A:
+                        for y in mu_B:
+                            amount_moved = variables[x, y].X
+                            if amount_moved > 0:
+                                print(f"Move {amount_moved} from {x} to {y}")
                 return total_cost
             else:
                 print(f"No optimal solution found for nodes {nodes_A} and {nodes_B}")
@@ -764,6 +765,9 @@ def update_orc_and_weights_iter(distance_matrix:list[list], graph:Hypergraph, ta
                 # TODO: Figure out the difference in Directed//Undirected
                 if isinstance(graph, UndirectedHypergraph):
                     orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose=verbose)
+                elif isinstance(graph, DirectedHypergraph): # We're a directed graph
+                    orc = 1 - graph.earthmover_distance_gurobi_distance_matrix(hyperedge_id, distance_matrix, verbose)
+            
                 # Normalize the curvature
                 normalized_orc = ricci_normalizing(orc)
                 # un-normalizing
@@ -791,6 +795,7 @@ def update_orc_and_weights_iter(distance_matrix:list[list], graph:Hypergraph, ta
  
  
 def calculate_target_orc(distance_matrix: list[list], graph:Hypergraph, verbose:bool, file_format='csv', op_flag=False):
+    # Works for Directed
     '''The function to calculate the staring infor for the target graph
 
     :param list[list] distance_matrix: matrix of minimal distances from the floyd_warshall function
@@ -814,8 +819,9 @@ def calculate_target_orc(distance_matrix: list[list], graph:Hypergraph, verbose:
         for hyperedge_id in graph.hyperedges:
             if isinstance(graph, UndirectedHypergraph):
                 orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose)
-            else: # We're a directed graph
-                orc = 1.0
+            elif isinstance(graph, DirectedHypergraph): 
+                orc = 1 - graph.earthmover_distance_gurobi_distance_matrix(hyperedge_id, distance_matrix, verbose)
+            print(orc)
             # normalizing
             normalized_orc = ricci_normalizing(orc)
             # un-normalizing
@@ -896,6 +902,7 @@ def early_analysis(src_graph:Hypergraph, verbose:bool):
         print('The actual nodes:', src_graph.nodes)
         print('The actual edges with weights:', src_graph.weights)
         
+        # TODO: Add strongly connected check
         print("The hypergraph is weakly connected." if connected else "The hypergraph is not weakly connected.")
         
         print(f"Max Degree: {max_degree}")
@@ -914,7 +921,7 @@ def early_analysis(src_graph:Hypergraph, verbose:bool):
     return
 
         
-def one_direction_of_work(src_graph:Hypergraph, targ_graph:Hypergraph, tot_its = 100):
+def one_direction_of_work(src_graph:Hypergraph, targ_graph:Hypergraph, tot_its = 100, op_flag=False):
     '''Find out if one direction converges from source to target
 
     :param Hypergraph src_graph: The source graph
@@ -923,12 +930,18 @@ def one_direction_of_work(src_graph:Hypergraph, targ_graph:Hypergraph, tot_its =
     '''
     print('working on distance matrices')
     distance_matrix = src_graph.floyd_warshall()
-    save_matrix_csv(distance_matrix, 'outputfiles/undirected_source_dist_fw.csv')
+    matfilename = 'outputfiles/'
+    if op_flag: matfilename += 'op_'
+    matfilename += 'undirected_source_dist_fw.csv'
+    save_matrix_csv(distance_matrix, matfilename)
     
     clock_time('Time to make the source distance matrix')
 
     target_distance_matrix = targ_graph.floyd_warshall()
-    save_matrix_csv(target_distance_matrix, 'outputfiles/undirected_target_dist_fw.csv')
+    matfilename = 'outputfiles/'
+    if op_flag: matfilename += 'op_'
+    matfilename += 'undirected_target_dist_fw.csv'
+    save_matrix_csv(target_distance_matrix, matfilename)
     
     clock_time('Time to make the target distance matrix')
 
@@ -942,11 +955,11 @@ def one_direction_of_work(src_graph:Hypergraph, targ_graph:Hypergraph, tot_its =
     #TODO: check to see if the guys are Known Node Correspondence. 
     # Maybe just check that all the nodes are labeled the same.
 
-    calculate_target_orc(target_distance_matrix, targ_graph, verbose)
+    calculate_target_orc(target_distance_matrix, targ_graph, verbose, op_flag=op_flag)
 
     clock_time('Time to calc target ORC')
 
-    update_orc_and_weights_iter(distance_matrix, src_graph, targ_graph, iteration=0, verbose=verbose)
+    update_orc_and_weights_iter(distance_matrix, src_graph, targ_graph, iteration=0, verbose=verbose, op_flag=op_flag)
 
     clock_time('Time to calc source ORC')
     
@@ -954,7 +967,7 @@ def one_direction_of_work(src_graph:Hypergraph, targ_graph:Hypergraph, tot_its =
         print('Working on itteration', i)
         distance_matrix_i = src_graph.floyd_warshall()
                 
-        update_orc_and_weights_iter(distance_matrix_i, src_graph, targ_graph, iteration=i, verbose=verbose)
+        update_orc_and_weights_iter(distance_matrix_i, src_graph, targ_graph, iteration=i, verbose=verbose, op_flag=op_flag)
         clock_time(f'Time for ORC {i}')
               
         allstable = True
@@ -1001,7 +1014,7 @@ if __name__ == "__main__":
     # average absolute difference and see if that's small
     # try a network such that the sum of the two weights are the same
 
-    directed_flag = False
+    directed_flag = True
     verbose = False
      
     clean_output(verbose)
@@ -1052,7 +1065,7 @@ if __name__ == "__main__":
          
     clock_time('Time to analyze graphs')
      
-    one_direction_of_work(source_graph, target_graph, tot_its=100)  
+    one_direction_of_work(source_graph, target_graph, tot_its=100, op_flag=False)  
   
     clock_time('Time for source->target')
     
@@ -1073,7 +1086,7 @@ if __name__ == "__main__":
     print('building target')
     target_graph.build_from_dataframe(data_source, verbose)
         
-    one_direction_of_work(source_graph, target_graph, tot_its=100)
+    one_direction_of_work(source_graph, target_graph, tot_its=100, op_flag = True)
       
     clock_time('Time for final')
    
