@@ -758,7 +758,6 @@ def calculate_target_orc(distance_matrix: list[list], graph:Hypergraph, verbose:
                 orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose)
             elif isinstance(graph, DirectedHypergraph): 
                 orc = 1 - graph.earthmover_distance_gurobi_distance_matrix(hyperedge_id, distance_matrix, verbose)
-            print(orc)
             # normalizing
             normalized_orc = ricci_normalizing(orc)
             # un-normalizing
@@ -918,10 +917,11 @@ def one_direction_of_work(src_graph:Hypergraph, targ_graph:Hypergraph, tot_its =
             old = clist[-2]
             new = clist[-1]
             if old != 0:
-                error = abs((old-new)/old)
+                # error = abs((old-new)/old)
+                error = abs(old-new)
             else: 
                 error = abs(old-new)
-            if error > 0.05:
+            if error > 0.01:
                 # if verbose:
                 print('unstable for edge ', e, ' with error ', error)
                 finustab = e
@@ -950,7 +950,7 @@ if __name__ == "__main__":
     # average absolute difference and see if that's small
     # try a network such that the sum of the two weights are the same
 
-    directed_flag = False
+    directed_flag = True
     verbose = False
      
     clean_output(verbose)
