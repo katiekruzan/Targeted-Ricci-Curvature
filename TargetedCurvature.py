@@ -950,7 +950,7 @@ if __name__ == "__main__":
     # average absolute difference and see if that's small
     # try a network such that the sum of the two weights are the same
 
-    directed_flag = True
+    directed_flag = False
     verbose = False
      
     clean_output(verbose)
@@ -964,8 +964,8 @@ if __name__ == "__main__":
     And the nodes must be labeled the same in both graphs for this to work
     '''
     start = time.time()
-    target_filename = 'petersen/petersengraph.csv'
-    source_filename = 'petersen/petersengraph_newbigweights.csv'
+    target_filename = 'ERgraph100nodep4.csv'
+    source_filename = 'ERgraph100n5changev4range1000to2000.csv'
     
     data_target = pd.read_csv(f'inputfiles/{target_filename}', dtype ={'source': str, 'target':str}, sep=',')  
     data_source = pd.read_csv(f'inputfiles/{source_filename}', dtype ={'source': str, 'target':str}, sep=',')  
