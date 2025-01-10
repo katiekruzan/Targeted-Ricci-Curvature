@@ -320,7 +320,7 @@ class UndirectedHypergraph(Hypergraph):
         self.weights[hyperedge_id] = weight_list
         return
     
-    def add_missing_target_edges(self, targ_graph:Hypergraph, targ_dist_mat: list[list], verbose:bool)->None:
+    def add_missing_target_edges(self, targ_graph:Hypergraph, self_dist_mat: list[list], verbose:bool)->None:
         '''This will be used in the case where the target graph has edges this graph does not. We must add them.
         Right now, initializing them to the shortest distance in the current graph.
 
@@ -332,7 +332,12 @@ class UndirectedHypergraph(Hypergraph):
             # TODO: Change when getting to hypergraphs
             node1 = targ_graph.hyperedges[e][0]
             node2 = targ_graph.hyperedges[e][1]
-            dist = targ_dist_mat[targ_graph.node_index[node1]][targ_graph.node_index[node2]]
+            dist = self_dist_mat[self.node_index[node1]][self.node_index[node2]]
+            # print(targ_graph.node_index)
+            # print(targ_graph.node_index[node1])
+            # print(targ_graph.node_index[node2])
+            # print(targ_dist_mat)
+            print(e, dist)
             self.add_hyperedge(e, targ_graph.hyperedges[e], [dist], verbose)
             
     def add_missing_source_edges(self, src_graph:Hypergraph, verbose:bool) -> None:
@@ -776,6 +781,7 @@ def ricci_normalizing(R: float)->float:
     :param float R: the ORC value to be normalized 
     :return float: The normalized ORC value
     ''' 
+    # print(R)
     return ((1 - np.exp(-1))/(1+ np.exp(-R)))
 
 
@@ -885,7 +891,21 @@ def one_direction_of_work(src_graph:Hypergraph, targ_graph:Hypergraph, tot_its =
     if set(targ_graph.hyperedges) != set(src_graph.hyperedges):
         print ('Taking care of missing edges')
         # add edges that are in the target but not the source
-        src_graph.add_missing_target_edges(targ_graph, target_distance_matrix, verbose)
+        src_graph.add_missing_target_edges(targ_graph, distance_matrix, verbose)
+        targ_graph.add_missing_source_edges(src_graph, verbose)
+        
+        # recalculate the matrices
+        distance_matrix = src_graph.floyd_warshall()
+        matfilename = 'outputfiles/'
+        if op_flag: matfilename += 'op_'
+        matfilename += 'recalc_undirected_source_dist_fw.csv'
+        save_matrix_csv(distance_matrix, matfilename)
+        
+        target_distance_matrix = targ_graph.floyd_warshall()
+        matfilename = 'outputfiles/'
+        if op_flag: matfilename += 'op_'
+        matfilename += 'recalc_undirected_target_dist_fw.csv'
+        save_matrix_csv(target_distance_matrix, matfilename)
 
     print('starting ricci curvature')
     #TODO: check to see if the guys are Known Node Correspondence. 
@@ -917,11 +937,11 @@ def one_direction_of_work(src_graph:Hypergraph, targ_graph:Hypergraph, tot_its =
             old = clist[-2]
             new = clist[-1]
             if old != 0:
-                # error = abs((old-new)/old)
-                error = abs(old-new)
+                error = abs((old-new)/old)
+                # error = abs(old-new)
             else: 
                 error = abs(old-new)
-            if error > 0.01:
+            if error > 0.05:
                 # if verbose:
                 print('unstable for edge ', e, ' with error ', error)
                 finustab = e
@@ -964,8 +984,8 @@ if __name__ == "__main__":
     And the nodes must be labeled the same in both graphs for this to work
     '''
     start = time.time()
-    target_filename = 'ERgraph100nodep4.csv'
-    source_filename = 'ERgraph100n5changev4range1000to2000.csv'
+    source_filename = 'petersen/petersengraph.csv'
+    target_filename = 'petersen/petersengraphExtraEdge.csv'
     
     data_target = pd.read_csv(f'inputfiles/{target_filename}', dtype ={'source': str, 'target':str}, sep=',')  
     data_source = pd.read_csv(f'inputfiles/{source_filename}', dtype ={'source': str, 'target':str}, sep=',')  
