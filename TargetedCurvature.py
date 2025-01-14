@@ -510,8 +510,9 @@ class UndirectedHypergraph(Hypergraph):
             weight = self.weights[hyperedge_id][-1]
             if weight == 0:
                 # this is the orc 
-                # TODO: check to see if this makes sense for weight =0 in a real way
-                return 1 - average_emd
+                # TODO: check to see if this makes sense for weight =0 in a real way. 
+                # In theory this should return -inf
+                return -np.inf
             else:
                 # this is the orc. This is the EMD/dist(u,v) and dist(u,v) will just be the weight of the edge
                 return 1 - average_emd/weight
@@ -937,11 +938,11 @@ def one_direction_of_work(src_graph:Hypergraph, targ_graph:Hypergraph, tot_its =
             old = clist[-2]
             new = clist[-1]
             if old != 0:
-                error = abs((old-new)/old)
-                # error = abs(old-new)
+                # error = abs((old-new)/old)
+                error = abs(old-new)
             else: 
                 error = abs(old-new)
-            if error > 0.05:
+            if error > 0.01:
                 # if verbose:
                 print('unstable for edge ', e, ' with error ', error)
                 finustab = e
@@ -984,8 +985,10 @@ if __name__ == "__main__":
     And the nodes must be labeled the same in both graphs for this to work
     '''
     start = time.time()
-    source_filename = 'petersen/petersengraph.csv'
-    target_filename = 'petersen/petersengraphExtraEdge.csv'
+    # source_filename = 'petersen/petersengraph.csv'
+    # target_filename = 'petersen/petersengraphExtraEdge.csv'
+    source_filename = 'ERgraph100nodep4.csv'
+    target_filename = 'ERgraph100nodep4_add10edges.csv'
     
     data_target = pd.read_csv(f'inputfiles/{target_filename}', dtype ={'source': str, 'target':str}, sep=',')  
     data_source = pd.read_csv(f'inputfiles/{source_filename}', dtype ={'source': str, 'target':str}, sep=',')  
