@@ -288,6 +288,26 @@ class Hypergraph:
             print(f"Gurobi Error: {e}\n for data {data}")
             return None 
 
+    def add_missing_edges(self, other_graph, verbose:bool) -> None:
+        '''The thing to be changed, need to happen in both directions. So we're combining them. 
+        Also should just be adding an edge, which might be an issue? But maybe not???
+
+        :param Hypergraph other_graph: The other graph we're working with. Should be of the same type as self.
+        :param bool verbose: verbose flag
+        '''
+        lastweights = [k[-1] for k in self.weights.values()]
+        # need to find the min weight of the graph 
+        minweight = min(lastweights)
+        # or the max weight of the graph
+        maxweight = max(lastweights)
+        placeholder = minweight/3.0
+        
+        for e in set(other_graph.hyperedges) - set(self.hyperedges):
+            if isinstance(self, UndirectedHypergraph):
+                print(e,placeholder)
+                self.add_hyperedge(e, other_graph.hyperedges[e], [placeholder], verbose)
+            #TODO: Implement for Directed
+
 
 class UndirectedHypergraph(Hypergraph):
     def add_hyperedge(self, hyperedge_id:str, nodes:list, weight_list = [1], verbose=True)-> None:
@@ -319,37 +339,6 @@ class UndirectedHypergraph(Hypergraph):
         self.hyperedges[hyperedge_id] = nodes
         self.weights[hyperedge_id] = weight_list
         return
-    
-    def add_missing_target_edges(self, targ_graph:Hypergraph, self_dist_mat: list[list], verbose:bool)->None:
-        '''This will be used in the case where the target graph has edges this graph does not. We must add them.
-        Right now, initializing them to the shortest distance in the current graph.
-
-        :param Hypergraph targ_graph: The target graph
-        :param list[list] targ_dist_mat: the distance matrix of that graph from floyd warshall
-        :param bool verbose: verbose flag
-        '''
-        for e in set(targ_graph.hyperedges) - set(self.hyperedges):
-            # TODO: Change when getting to hypergraphs
-            node1 = targ_graph.hyperedges[e][0]
-            node2 = targ_graph.hyperedges[e][1]
-            dist = self_dist_mat[self.node_index[node1]][self.node_index[node2]]
-            # print(targ_graph.node_index)
-            # print(targ_graph.node_index[node1])
-            # print(targ_graph.node_index[node2])
-            # print(targ_dist_mat)
-            print(e, dist)
-            self.add_hyperedge(e, targ_graph.hyperedges[e], [dist], verbose)
-            
-    def add_missing_source_edges(self, src_graph:Hypergraph, verbose:bool) -> None:
-        '''This will be used in the case where the source graph has edges this graph does not. We must add them.
-        Right now, initializing them to a weight of 0.
-        #TODO: check to see if this makes sense
-
-        :param Hypergraph src_graph: the source graph in question
-        :param bool verbose: the verbose flag
-        '''
-        for e in set(src_graph.hyperedges) - set(self.hyperedges):
-            self.add_hyperedge(e, src_graph.hyperedges[e], [0], verbose)
         
     def build_from_dataframe(self, df:pd.DataFrame, verbose=True)-> None:
         '''Build hypergraph from a DataFrame
@@ -892,8 +881,8 @@ def one_direction_of_work(src_graph:Hypergraph, targ_graph:Hypergraph, tot_its =
     if set(targ_graph.hyperedges) != set(src_graph.hyperedges):
         print ('Taking care of missing edges')
         # add edges that are in the target but not the source
-        src_graph.add_missing_target_edges(targ_graph, distance_matrix, verbose)
-        targ_graph.add_missing_source_edges(src_graph, verbose)
+        src_graph.add_missing_edges(targ_graph, verbose)
+        targ_graph.add_missing_edges(src_graph, verbose)
         
         # recalculate the matrices
         distance_matrix = src_graph.floyd_warshall()
