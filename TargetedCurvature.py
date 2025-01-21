@@ -298,14 +298,36 @@ class Hypergraph:
         lastweights = [k[-1] for k in self.weights.values()]
         # need to find the min weight of the graph 
         minweight = min(lastweights)
+        placeholder = minweight/3.0
         # or the max weight of the graph
         maxweight = max(lastweights)
-        placeholder = minweight/3.0
+        placeholder = maxweight * 333333333333.0
         
         for e in set(other_graph.hyperedges) - set(self.hyperedges):
             if isinstance(self, UndirectedHypergraph):
                 print(e,placeholder)
                 self.add_hyperedge(e, other_graph.hyperedges[e], [placeholder], verbose)
+            #TODO: Implement for Directed
+            
+    def add_missing_edges_shortest_path(self, other_graph, verbose:bool) -> None:
+        '''The thing to be changed, need to happen in both directions. So we're combining them. 
+        Also should just be adding an edge, which might be an issue? But maybe not???
+
+        :param Hypergraph other_graph: The other graph we're working with. Should be of the same type as self.
+        :param bool verbose: verbose flag
+        '''
+        # lastweights = [k[-1] for k in self.weights.values()]
+        # # need to find the min weight of the graph 
+        # minweight = min(lastweights)
+        # placeholder = minweight/3.0
+        # # or the max weight of the graph
+        # maxweight = max(lastweights)
+        # placeholder = maxweight * 333333333333.0
+        
+        # for e in set(other_graph.hyperedges) - set(self.hyperedges):
+        #     if isinstance(self, UndirectedHypergraph):
+        #         print(e,placeholder)
+        #         self.add_hyperedge(e, other_graph.hyperedges[e], [placeholder], verbose)
             #TODO: Implement for Directed
 
 
@@ -974,10 +996,11 @@ if __name__ == "__main__":
     And the nodes must be labeled the same in both graphs for this to work
     '''
     start = time.time()
-    # source_filename = 'petersen/petersengraph.csv'
-    # target_filename = 'petersen/petersengraphExtraEdge.csv'
-    source_filename = 'ERgraph100nodep4.csv'
-    target_filename = 'ERgraph100nodep4_add10edges.csv'
+    #TODO: try the shortest path version
+    source_filename = 'petersen/petersengraph.csv'
+    target_filename = 'petersen/petersengraphExtraEdge.csv'
+    # source_filename = 'ERgraph100nodep4.csv'
+    # target_filename = 'ERgraph100nodep4_add1edge.csv'
     
     data_target = pd.read_csv(f'inputfiles/{target_filename}', dtype ={'source': str, 'target':str}, sep=',')  
     data_source = pd.read_csv(f'inputfiles/{source_filename}', dtype ={'source': str, 'target':str}, sep=',')  
