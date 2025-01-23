@@ -49,6 +49,14 @@ class Hypergraph:
         if weight is not None:
             self.weights[hyperedge_id].append(weight)
        
+    def remove_hyperedge(self, hyperedge_id:str) -> None:
+        ''' Remove a hyperedge from the graph. Notably, will not remove the nodes
+
+        :param str hyperedge_id: The hyperedge to be deleted
+        '''
+        del self.hyperedges[hyperedge_id]
+        return
+    
     def update_node_index(self) -> None:
         '''The goal is to ensure there is a static node index for the graph. This function generates it
         '''
@@ -309,25 +317,19 @@ class Hypergraph:
                 self.add_hyperedge(e, other_graph.hyperedges[e], [placeholder], verbose)
             #TODO: Implement for Directed
             
-    def add_missing_edges_shortest_path(self, other_graph, verbose:bool) -> None:
-        '''The thing to be changed, need to happen in both directions. So we're combining them. 
-        Also should just be adding an edge, which might be an issue? But maybe not???
+    def add_missing_edges_shortest_path(self, other_graph, self_dist_mat, verbose:bool) -> None:
+        '''So the idea, will be to add this edge, and then later delete it. Need to think about how to keep track of them
+        For now, we're just testing on undirected. So will go forward on that.
 
         :param Hypergraph other_graph: The other graph we're working with. Should be of the same type as self.
         :param bool verbose: verbose flag
         '''
-        # lastweights = [k[-1] for k in self.weights.values()]
-        # # need to find the min weight of the graph 
-        # minweight = min(lastweights)
-        # placeholder = minweight/3.0
-        # # or the max weight of the graph
-        # maxweight = max(lastweights)
-        # placeholder = maxweight * 333333333333.0
-        
-        # for e in set(other_graph.hyperedges) - set(self.hyperedges):
-        #     if isinstance(self, UndirectedHypergraph):
-        #         print(e,placeholder)
-        #         self.add_hyperedge(e, other_graph.hyperedges[e], [placeholder], verbose)
+        for e in set(other_graph.hyperedges) - set(self.hyperedges):
+            if isinstance(self, UndirectedHypergraph):
+                node1 = other_graph.hyperedges[e][0]
+                node2 = other_graph.hyperedges[e][1]
+                dist = self_dist_mat[self.node_index[node1]][self.node_index[node2]]
+                self.add_hyperedge(e, other_graph.hyperedges[e], [dist], verbose)
             #TODO: Implement for Directed
 
 
@@ -899,29 +901,24 @@ def one_direction_of_work(src_graph:Hypergraph, targ_graph:Hypergraph, tot_its =
     
     clock_time('Time to make the target distance matrix')
 
-    # TODO: Check this works (not testing it right now)
     if set(targ_graph.hyperedges) != set(src_graph.hyperedges):
+        # logging the edges that are different
+        missing_from_src = set(targ_graph.hyperedges) - set(src_graph.hyperedges)
+        missing_from_targ = set(src_graph.hyperedges) - set(targ_graph.hyperedges)
+        
         print ('Taking care of missing edges')
         # add edges that are in the target but not the source
-        src_graph.add_missing_edges(targ_graph, verbose)
-        targ_graph.add_missing_edges(src_graph, verbose)
+        # src_graph.add_missing_edges(targ_graph, verbose)
+        # targ_graph.add_missing_edges(src_graph, verbose)
+        src_graph.add_missing_edges_shortest_path(targ_graph, distance_matrix, verbose)
+        targ_graph.add_missing_edges_shortest_path(src_graph, target_distance_matrix, verbose)
         
         # recalculate the matrices
         distance_matrix = src_graph.floyd_warshall()
-        matfilename = 'outputfiles/'
-        if op_flag: matfilename += 'op_'
-        matfilename += 'recalc_undirected_source_dist_fw.csv'
-        save_matrix_csv(distance_matrix, matfilename)
         
         target_distance_matrix = targ_graph.floyd_warshall()
-        matfilename = 'outputfiles/'
-        if op_flag: matfilename += 'op_'
-        matfilename += 'recalc_undirected_target_dist_fw.csv'
-        save_matrix_csv(target_distance_matrix, matfilename)
 
     print('starting ricci curvature')
-    #TODO: check to see if the guys are Known Node Correspondence. 
-    # Maybe just check that all the nodes are labeled the same.
 
     calculate_target_orc(target_distance_matrix, targ_graph, verbose, op_flag=op_flag)
 
@@ -934,9 +931,26 @@ def one_direction_of_work(src_graph:Hypergraph, targ_graph:Hypergraph, tot_its =
     for i in range(1, tot_its + 1):
         print('Working on itteration', i)
         distance_matrix_i = src_graph.floyd_warshall()
-                
+        # print(src_graph.weights)
+        if i>1:
+            if len(missing_from_src)> 0 or len(missing_from_targ)> 0:
+                # We're gonna to the reset here
+                src_graph.add_missing_edges_shortest_path(targ_graph, distance_matrix, verbose)
+                targ_graph.add_missing_edges_shortest_path(src_graph, target_distance_matrix, verbose)
+        
+        # print(src_graph.weights)        
         update_orc_and_weights_iter(distance_matrix_i, src_graph, targ_graph, iteration=i, verbose=verbose, op_flag=op_flag)
         clock_time(f'Time for ORC {i}')
+        
+        # if i == 4: quit()
+        # We will do a "reset" here
+        if len(missing_from_src)> 0 or len(missing_from_targ)> 0:
+            # We're gonna to the reset here
+            #first delete all the edges
+            for e in missing_from_src:
+                src_graph.remove_hyperedge(e)
+            for e in missing_from_targ:
+                targ_graph.remove_hyperedge(e)
               
         allstable = True
         finustab = None
@@ -997,10 +1011,10 @@ if __name__ == "__main__":
     '''
     start = time.time()
     #TODO: try the shortest path version
-    source_filename = 'petersen/petersengraph.csv'
-    target_filename = 'petersen/petersengraphExtraEdge.csv'
-    # source_filename = 'ERgraph100nodep4.csv'
-    # target_filename = 'ERgraph100nodep4_add1edge.csv'
+    # source_filename = 'petersen/petersengraph.csv'
+    # target_filename = 'petersen/petersengraphExtraEdge.csv'
+    source_filename = 'ERgraph100nodep4.csv'
+    target_filename = 'ERgraph100nodep4_add10edges.csv'
     
     data_target = pd.read_csv(f'inputfiles/{target_filename}', dtype ={'source': str, 'target':str}, sep=',')  
     data_source = pd.read_csv(f'inputfiles/{source_filename}', dtype ={'source': str, 'target':str}, sep=',')  
