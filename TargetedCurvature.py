@@ -727,6 +727,7 @@ def update_orc_and_weights_iter(distance_matrix:list[list], graph:Hypergraph, ta
             
                 # Normalize the curvature
                 normalized_orc = ricci_normalizing(orc)
+                
                 # un-normalizing
                 # normalized_orc = orc
                 # add the value to our graph
@@ -735,10 +736,9 @@ def update_orc_and_weights_iter(distance_matrix:list[list], graph:Hypergraph, ta
                 weight = graph.weights[hyperedge_id][-1]
                 if iteration != 0:
                     orc_targ = targ_graph.ricci_curvature[hyperedge_id][-1]
-                    
                     if weight != 0:
                         #simple version
-                        step = 2
+                        step = 1
                         wtplus1 = weight*(1  - step*(normalized_orc - orc_targ))
                         normalized_weight = wtplus1
                     else:
@@ -900,6 +900,8 @@ def one_direction_of_work(src_graph:Hypergraph, targ_graph:Hypergraph, tot_its =
     save_matrix_csv(target_distance_matrix, matfilename)
     
     clock_time('Time to make the target distance matrix')
+    
+    missing_from_src, missing_from_targ = [], []
 
     if set(targ_graph.hyperedges) != set(src_graph.hyperedges):
         # logging the edges that are different
@@ -958,6 +960,7 @@ def one_direction_of_work(src_graph:Hypergraph, targ_graph:Hypergraph, tot_its =
             #TODO: fix this weirdness
             # take care of the getting started case
             continue
+        errorlist = []
         for e in src_graph.hyperedges:
             clist = src_graph.ricci_curvature[e]
             old = clist[-2]
@@ -973,13 +976,14 @@ def one_direction_of_work(src_graph:Hypergraph, targ_graph:Hypergraph, tot_its =
                 finustab = e
                 allstable = False
                 break
-            # errorlist.append(error)
-        # if np.average(errorlist) > 0.03:
-            # if verbose:
-            # print('average error too high with error average of: ', np.average(errorlist))
+            errorlist.append(error)
+        # if np.average(errorlist) > 0.001:
+        #     #if verbose:
+        #     print('average error too high with error average of: ', np.average(errorlist))
         # else:
         if allstable:
             print('STABILIZED! Source to target distance is ',i)
+            print(np.average(errorlist))
             write_scorecard('\n\n----- Results -----')
             write_scorecard(f'Source to target distance is {i}')
             break
@@ -1010,11 +1014,11 @@ if __name__ == "__main__":
     And the nodes must be labeled the same in both graphs for this to work
     '''
     start = time.time()
-    #TODO: try the shortest path version
-    # source_filename = 'petersen/petersengraph.csv'
-    # target_filename = 'petersen/petersengraphExtraEdge.csv'
-    source_filename = 'ERgraph100nodep4.csv'
-    target_filename = 'ERgraph100nodep4_add10edges.csv'
+    source_filename = 'petersen/petersengraph.csv'
+    target_filename = 'petersen/petersengraph_bigedges.csv'
+    # source_filename = 'ERgraph100nodep4.csv'
+    # target_filename = 'rangechanges/ERgraph100n5changev3range1000to2000.csv'
+    # target_filename = 'ERgraph100nodep4_add10edges.csv'
     
     data_target = pd.read_csv(f'inputfiles/{target_filename}', dtype ={'source': str, 'target':str}, sep=',')  
     data_source = pd.read_csv(f'inputfiles/{source_filename}', dtype ={'source': str, 'target':str}, sep=',')  
@@ -1049,7 +1053,7 @@ if __name__ == "__main__":
     clock_time('Time to analyze graphs')
      
     one_direction_of_work(source_graph, target_graph, tot_its=100, op_flag=False)  
-  
+    
     clock_time('Time for source->target')
     
     write_scorecard('\n')
