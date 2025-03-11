@@ -753,7 +753,7 @@ def update_orc_and_weights_iter_manager(npr, distance_matrix:list[list], graph:H
                         SLICE = (edges[(jobcnt-1) * chunksize::], distance_matrix, graph, targ_graph, file_name, verbose, iteration)
                     else: 
                         SLICE = (edges[(jobcnt-1) * chunksize: jobcnt * chunksize], distance_matrix, graph, targ_graph, file_name, verbose, iteration)
-                    COMM.send(SLICE, dest = i, tag=33)
+                    COMM.send(SLICE, dest = i, tag=44)
                     if True:
                         print('-> manager sends job', jobcnt, 'to worker', i)
                 # receive the jobs // sync the graphs.
@@ -769,9 +769,9 @@ def update_orc_and_weights_iter_manager(npr, distance_matrix:list[list], graph:H
             
                     
 def update_orc_and_weights_iter_worker():
-    specs = COMM.recv(source = 0, tag = 33)
+    specs = COMM.recv(source = 0, tag = 44)
     if specs == -1: 
-        return
+        return False
     jobs, distance_matrix, graph, targ_graph, file_name, verbose, itteration = specs
     with open(file_name, 'a', newline='') as file:
         writer = csv.writer(file)
@@ -799,7 +799,7 @@ def update_orc_and_weights_iter_worker():
             else: 
                 writer.writerow([hyperedge_id, normalized_orc, weight])
     COMM.send((graph,jobs) , dest=0, tag=11)
-    return
+    return True
 
 
 def calculate_target_orc_manager(npr, distance_matrix: list[list], graph:Hypergraph, verbose:bool, op_flag=False):
@@ -1123,9 +1123,8 @@ def one_direction_of_work(src_graph:Hypergraph, targ_graph:Hypergraph, tot_its =
 
     return
 
-def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100):
+def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100, op_flag=False):
     # One Direction of Work
-    op_flag = False
     targ_distance_matrix, distance_matrix, missing_from_src, missing_from_targ = set_up_one_direction(src_graph, targ_graph, op_flag)
     
     print('starting ricci curvature')
@@ -1183,6 +1182,9 @@ def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100):
                 break
             errorlist.append(error)
         if allstable:
+            #turn off all workers.
+            for i in range(1,npr):
+                COMM.send(-1, dest = i, tag = 44)
             print('STABILIZED! Source to target distance is ',i)
             print(np.average(errorlist))
             write_scorecard('\n\n----- Results -----')
@@ -1192,8 +1194,9 @@ def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100):
     
 
 def one_direction_of_work_worker(tot_its = 100):    
-    for i in range(1, tot_its + 1):
-        update_orc_and_weights_iter_worker()
+    while True:
+        cont = update_orc_and_weights_iter_worker()
+        if not cont: break
     return 
 
     
@@ -1217,37 +1220,61 @@ def manager(npr, verbose = True):
     
     clock_time('Time to read the data in seconds')
     
+    # if directed_flag:
+    #     source_graph = DirectedHypergraph()
+    #     target_graph = DirectedHypergraph()
+    # else:
+    #     source_graph = UndirectedHypergraph()
+    #     target_graph = UndirectedHypergraph() 
+        
+    # print('building source')          
+    # source_graph.build_from_dataframe(data_source, verbose)
+    # print('building target')
+    # target_graph.build_from_dataframe(data_target, verbose)
+    
+    # clock_time('Time to build the graphs')
+    
+    # if not (source_graph.is_2_uniform() and target_graph.is_2_uniform()) :
+    #     print('This has not been fully fleshed out for hypergraphs. Please give a 2-uniform graph')
+    #     quit()
+    
+    # early_analysis(source_graph, verbose)
+    # clock_time('Time to analyze graphs')
+    
+    # # One Direction of Work
+    # one_direction_of_work_manager(npr, source_graph, target_graph)
+    
+    # clock_time('Time for source->target')
+
+    # write_scorecard('\n')
+
+    # Go the other way
+    print('Now checking Target to Source....')
+    
     if directed_flag:
         source_graph = DirectedHypergraph()
         target_graph = DirectedHypergraph()
     else:
         source_graph = UndirectedHypergraph()
-        target_graph = UndirectedHypergraph() 
-        
-    print('building source')          
-    source_graph.build_from_dataframe(data_source, verbose)
+        target_graph = UndirectedHypergraph()          
+    
+    # swap them
+    print('building source')
+    source_graph.build_from_dataframe(data_target, verbose)
     print('building target')
-    target_graph.build_from_dataframe(data_target, verbose)
+    target_graph.build_from_dataframe(data_source, verbose)
     
-    clock_time('Time to build the graphs')
-    
-    if not (source_graph.is_2_uniform() and target_graph.is_2_uniform()) :
-        print('This has not been fully fleshed out for hypergraphs. Please give a 2-uniform graph')
-        quit()
-    
-    early_analysis(source_graph, verbose)
-    clock_time('Time to analyze graphs')
-    
-    # One Direction of Work
-    one_direction_of_work_manager(npr, source_graph, target_graph)
-
-
-    # split the jobs off
-    
-    # recieve the jobs
+    one_direction_of_work_manager(npr, source_graph, target_graph, tot_its=100, op_flag = True)
+      
+    clock_time('Time for final')
     
     # tell the jobs to sleep (at the very end)
-    
+    # send the jobs
+    for i in range(1, npr):
+        SLICE = -33
+        COMM.send(SLICE, dest = i, tag=55)
+        if True:
+            print(f'-> manager sends {SLICE} to worker', i)
     return
 
 def worker(w, verbose = True):
@@ -1255,6 +1282,13 @@ def worker(w, verbose = True):
     calculate_target_orc_worker()
     update_orc_and_weights_iter_worker()
     one_direction_of_work_worker()
+    one_direction_of_work_worker()
+    print(f'Worker {w} gets to before the true statement')
+    while True:
+        specs = COMM.recv(source = 0, tag = 55)
+        if specs == -33: 
+            print(f'Worker {w} goes to sleep')
+            break
     return    
   
 if __name__ == "__main__": 
@@ -1267,5 +1301,7 @@ if __name__ == "__main__":
     SIZE = COMM.Get_size()
     if RANK == 0:
         manager(SIZE, verbose=False)
-    else: worker(RANK, verbose=False)
+    else: 
+        worker(RANK, verbose=False)
+    print(f'node {RANK} made it to the end')
     # main()
