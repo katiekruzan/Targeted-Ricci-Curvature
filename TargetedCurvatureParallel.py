@@ -14,7 +14,7 @@ import pandas as pd
 import csv
 import numpy as np
 from itertools import combinations
-from gurobipy import Model, GRB, quicksum, LinExpr
+from gurobipy import Model, GRB, quicksum, LinExpr, Env
 import time
 import os
 from numbers import Number
@@ -263,9 +263,16 @@ class Hypergraph:
         # Create a mapping of nodes to their indices in the distance matrix.
         node_to_index = self.node_index
         
+        env = Env(empty=True)
+        env.setParam("OutputFlag",0)
+        env.start()
+        
         try:
             # Create a new model in Gurobi.
-            model = Model("EarthMoverDistance")
+            model = Model("EarthMoverDistance", env=env)
+            
+            # # Make it less verbose
+            # model.Params.LogToConsole = 0   
             
             # Set up the log file
             # log_filename = f"gurobi_log_{data}.log"
@@ -273,9 +280,6 @@ class Hypergraph:
             
             # Create variables for the linear program.
             variables = model.addVars(mu_A.keys(), mu_B.keys(), name="z", lb=0) 
-            
-            # Make it less verbose
-            model.Params.LogToConsole = 0          
             
             expr = LinExpr(3.0)
             expr.clear()
