@@ -999,7 +999,7 @@ def set_up_one_direction(src_graph:Hypergraph, targ_graph:Hypergraph, op_flag=Fa
         
         target_distance_matrix = targ_graph.floyd_warshall()
     
-    return target_distance_matrix, distance_matrix
+    return target_distance_matrix, distance_matrix, missing_from_src, missing_from_targ
 
         
 def one_direction_of_work(src_graph:Hypergraph, targ_graph:Hypergraph, tot_its = 100, op_flag=False):
@@ -1118,6 +1118,80 @@ def one_direction_of_work(src_graph:Hypergraph, targ_graph:Hypergraph, tot_its =
         print(src_graph.weights[finustab])
 
     return
+
+def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100):
+    # One Direction of Work
+    op_flag = False
+    targ_distance_matrix, distance_matrix, missing_from_src, missing_from_targ = set_up_one_direction(src_graph, targ_graph, op_flag)
+    
+    print('starting ricci curvature')
+    # Now I have to parallelize this buddy
+    calculate_target_orc_manager(npr, targ_distance_matrix, targ_graph, verbose, op_flag=op_flag)
+
+    clock_time('Time to calc target ORC')
+
+    update_orc_and_weights_iter_manager(npr, distance_matrix, src_graph, targ_graph, iteration=0, verbose=verbose, op_flag=op_flag)
+
+    clock_time('Time to calc source ORC')
+    
+    for i in range(1, tot_its + 1):
+        print('Working on itteration', i)
+        distance_matrix_i = src_graph.floyd_warshall()
+        print('finished floyd warshall')
+        if i>1:
+            if len(missing_from_src)> 0 or len(missing_from_targ)> 0:
+                # We're gonna to the reset here
+                src_graph.add_missing_edges_shortest_path(targ_graph, distance_matrix, verbose)
+                targ_graph.add_missing_edges_shortest_path(src_graph, targ_distance_matrix, verbose)
+        update_orc_and_weights_iter_manager(npr, distance_matrix_i, src_graph, targ_graph, iteration=i, verbose=verbose, op_flag=op_flag)
+        clock_time(f'Time for ORC {i}')
+        
+        # We will do a "reset" here
+        if len(missing_from_src)> 0 or len(missing_from_targ)> 0:
+            # We're gonna to the reset here
+            #first delete all the edges
+            for e in missing_from_src:
+                src_graph.remove_hyperedge(e)
+            for e in missing_from_targ:
+                targ_graph.remove_hyperedge(e)
+                
+        allstable = True
+        finustab = None
+        if i == 1: 
+            #TODO: fix this weirdness
+            # take care of the getting started case
+            continue
+        errorlist = []
+        for e in src_graph.hyperedges:
+            clist = src_graph.ricci_curvature[e]
+            old = clist[-2]
+            new = clist[-1]
+            if old != 0:
+                # error = abs((old-new)/old)
+                error = abs(old-new)
+            else: 
+                error = abs(old-new)
+            if error > 0.01:
+                # if verbose:
+                print('unstable for edge ', e, ' with error ', error)
+                finustab = e
+                allstable = False
+                break
+            errorlist.append(error)
+        if allstable:
+            print('STABILIZED! Source to target distance is ',i)
+            print(np.average(errorlist))
+            write_scorecard('\n\n----- Results -----')
+            write_scorecard(f'Source to target distance is {i}')
+            break
+    return 
+    
+
+def one_direction_of_work_worker(tot_its = 100):    
+    for i in range(1, tot_its + 1):
+        update_orc_and_weights_iter_worker()
+    return 
+
     
 def manager(npr, verbose = True):
     # starting off things
@@ -1126,7 +1200,8 @@ def manager(npr, verbose = True):
     # source_filename = 'petersen/petersengraph.csv'
     # target_filename = 'petersen/petersengraph_bigedges.csv'
     source_filename = 'ERgraph100nodep4.csv'
-    target_filename = 'ERgraph100n5changev3.csv'
+    # target_filename = 'ERgraph100n5changev3.csv'
+    target_filename = 'rangechanges/ERgraph100n5changev3range1000to2000.csv'
 
     data_target = pd.read_csv(f'inputfiles/{target_filename}', dtype ={'source': str, 'target':str}, sep=',')  
     data_source = pd.read_csv(f'inputfiles/{source_filename}', dtype ={'source': str, 'target':str}, sep=',')  
@@ -1160,18 +1235,7 @@ def manager(npr, verbose = True):
     clock_time('Time to analyze graphs')
     
     # One Direction of Work
-    op_flag = False
-    targ_distance_matrix, distance_matrix = set_up_one_direction(source_graph, target_graph, op_flag)
-    
-    print('starting ricci curvature')
-    # Now I have to parallelize this buddy
-    calculate_target_orc_manager(npr, targ_distance_matrix, target_graph, verbose, op_flag=op_flag)
-
-    clock_time('Time to calc target ORC')
-
-    update_orc_and_weights_iter_manager(npr, distance_matrix, source_graph, target_graph, iteration=0, verbose=verbose, op_flag=op_flag)
-
-    clock_time('Time to calc source ORC')
+    one_direction_of_work_manager(npr, source_graph, target_graph)
 
 
     # split the jobs off
@@ -1186,6 +1250,7 @@ def worker(w, verbose = True):
     # quit()
     calculate_target_orc_worker()
     update_orc_and_weights_iter_worker()
+    one_direction_of_work_worker()
     return    
   
 if __name__ == "__main__": 
