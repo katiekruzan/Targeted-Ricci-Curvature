@@ -710,7 +710,7 @@ def save_matrix_csv(matrix:list[list], filename:str) -> None:
     pd.DataFrame(matrix).to_csv(filename, index=False, header=False)
 
 
-def update_orc_and_weights_iter(distance_matrix:list[list], graph:Hypergraph, targ_graph:Hypergraph,  iteration:int, verbose:bool, file_format='csv', op_flag = False):
+def update_orc_and_weights_iter_manager(npr, distance_matrix:list[list], graph:Hypergraph, targ_graph:Hypergraph,  iteration:int, verbose:bool, file_format='csv', op_flag = False):
     '''The main function of this whole sheboodle. Run the whole process for the given itteration
 
     :param list[list] distance_matrix: matrix of minimal distances from the floyd_warshall function
@@ -733,37 +733,69 @@ def update_orc_and_weights_iter(distance_matrix:list[list], graph:Hypergraph, ta
             # Check if the file is empty to write headers
             if file.tell() == 0:
                 writer.writerow(['Hyperedge ID', 'ORC: (based on t-1 weights)', 'Weight:t'])
-            
-            for hyperedge_id in graph.hyperedges:
-                if isinstance(graph, UndirectedHypergraph):
-                    orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose=verbose)
-                elif isinstance(graph, DirectedHypergraph): # We're a directed graph
-                    orc = 1 - graph.earthmover_distance_gurobi_distance_matrix(hyperedge_id, distance_matrix, verbose)
-            
-                # Normalize the curvature
-                normalized_orc = ricci_normalizing(orc)
                 
-                # un-normalizing
-                # normalized_orc = orc
-                # add the value to our graph
-                graph.add_ricci_curvature(hyperedge_id, normalized_orc)
-                # grab the latest weight the weights
-                weight = graph.weights[hyperedge_id][-1]
-                if iteration != 0:
-                    orc_targ = targ_graph.ricci_curvature[hyperedge_id][-1]
-                    if weight != 0:
-                        #simple version
-                        step = 1
-                        wtplus1 = weight*(1  - step*(normalized_orc - orc_targ))
-                        normalized_weight = wtplus1
-                    else:
-                        normalized_weight = 0
-
-                    graph.add_weights(hyperedge_id, normalized_weight)
+            # split the edges. Just do it the simple way. Just have the last one take the rest
+            edges = list(graph.hyperedges.keys())
+            njobs = len(graph.hyperedges)
+            chunksize = njobs//(npr-1)
+            jobcnt = 0
+            
+            while jobcnt < npr-1:
+                # send the jobs
+                for i in range(1, npr):
+                    jobcnt = jobcnt + 1
+                    SLICE = []
+                    if jobcnt == npr-1:
+                        SLICE = (edges[(jobcnt-1) * chunksize::], distance_matrix, graph, targ_graph, file_name, verbose, iteration)
+                    else: 
+                        SLICE = (edges[(jobcnt-1) * chunksize: jobcnt * chunksize], distance_matrix, graph, targ_graph, file_name, verbose, iteration)
+                    COMM.send(SLICE, dest = i, tag=33)
+                    if True:
+                        print('-> manager sends job', jobcnt, 'to worker', i)
+                # receive the jobs // sync the graphs.
+                for i in range(1, npr):
+                    newgraph, jobs = COMM.recv(source=i, tag=11)
+                    if True:
+                        print('-> manager received data from worker', i, 'number of jobs', len(jobs))
+                    for e in jobs: #sync up the graph
+                        graph.add_ricci_curvature(e, newgraph.ricci_curvature[e][-1])
+                        graph.add_weights(e, newgraph.weights[e][-1])
+                    clock_time(f'gathered data from processor: {i}')
+    return
+            
+                    
+def update_orc_and_weights_iter_worker():
+    specs = COMM.recv(source = 0, tag = 33)
+    if specs == -1: 
+        return
+    jobs, distance_matrix, graph, targ_graph, file_name, verbose, itteration = specs
+    with open(file_name, 'a', newline='') as file:
+        writer = csv.writer(file)
+        for hyperedge_id in jobs:
+            if isinstance(graph, UndirectedHypergraph):
+                orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose)
+            elif isinstance(graph, DirectedHypergraph): 
+                orc = 1 - graph.earthmover_distance_gurobi_distance_matrix(hyperedge_id, distance_matrix, verbose)
+            normalized_orc = ricci_normalizing(orc)
+            graph.add_ricci_curvature(hyperedge_id, normalized_orc)
+            weight = graph.weights[hyperedge_id][-1]
+            if itteration != 0:
+                orc_targ = targ_graph.ricci_curvature[hyperedge_id][-1]
+                if weight != 0:
+                    #simple version
+                    step = 1
+                    wtplus1 = weight*(1  - step*(normalized_orc - orc_targ))
+                    normalized_weight = wtplus1
+                else:
+                    normalized_weight = 0
                 
-                    writer.writerow([hyperedge_id, normalized_orc, normalized_weight])
-                else: 
-                    writer.writerow([hyperedge_id, normalized_orc, weight])
+                graph.add_weights(hyperedge_id, normalized_weight)
+            
+                writer.writerow([hyperedge_id, normalized_orc, normalized_weight])
+            else: 
+                writer.writerow([hyperedge_id, normalized_orc, weight])
+    COMM.send((graph,jobs) , dest=0, tag=11)
+    return
 
 
 def calculate_target_orc_manager(npr, distance_matrix: list[list], graph:Hypergraph, verbose:bool, op_flag=False):
@@ -1137,7 +1169,7 @@ def manager(npr, verbose = True):
 
     clock_time('Time to calc target ORC')
 
-    update_orc_and_weights_iter(distance_matrix, source_graph, target_graph, iteration=0, verbose=verbose, op_flag=op_flag)
+    update_orc_and_weights_iter_manager(npr, distance_matrix, source_graph, target_graph, iteration=0, verbose=verbose, op_flag=op_flag)
 
     clock_time('Time to calc source ORC')
 
@@ -1153,6 +1185,7 @@ def manager(npr, verbose = True):
 def worker(w, verbose = True):
     # quit()
     calculate_target_orc_worker()
+    update_orc_and_weights_iter_worker()
     return    
   
 if __name__ == "__main__": 
