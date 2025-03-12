@@ -712,6 +712,60 @@ def save_matrix_csv(matrix:list[list], filename:str) -> None:
     :param str filename: place to write it
     '''    
     pd.DataFrame(matrix).to_csv(filename, index=False, header=False)
+    
+def ricci_normalizing(R: float)->float: 
+    '''
+    Using the normalization function sigma(R)/sigma(1) 
+    Where sigma(x) is the standard sigmoid function 1/(1+\exp(-x))
+
+    :param float R: the ORC value to be normalized 
+    :return float: The normalized ORC value
+    ''' 
+    # print(R)
+    return ((1 - np.exp(-1))/(1+ np.exp(-R)))
+
+
+def clean_output(verbose:bool) -> None:
+    '''puts all the files (other than the README) in the outputfiles/ folder into a subfolder
+
+    :param bool verbose: Can turn on to print the file names it has moved.
+    '''
+    files = os.listdir('outputfiles')
+    now = time.time()
+    if not os.path.isdir(f'outputfiles/{now}'):
+        os.makedirs(f'outputfiles/{now}')
+    for f in files:
+        if f=='README.md' or os.path.isdir(f'outputfiles/{f}'):
+            continue
+        else:
+            try:
+                os.rename(f'outputfiles/{f}', f'outputfiles/{now}/{f}')
+                if verbose:
+                    print(f'moving {f} to {now}/{f}')
+            except:
+                print(f'Had issues moving {f} to a new folder')
+    return
+
+
+def write_scorecard(line:str)-> None:
+    '''function used to write the key results to a scorecard (for posterity)
+
+    :param str line: text to be put onto the scorecard
+    '''    
+    with open('outputfiles/scorecard.txt', 'a+') as f:
+        f.write(line)
+        f.write('\n')
+
+        
+def clock_time(message:str)-> None:
+    '''Get the time from the start of the process and write it to the scorecard with some message
+
+    :param str message: The message to put before the time being spent
+    '''
+    now = time.time()
+    rt = now-start
+    write_scorecard(f'{message}: {rt}')
+    return
 
 
 def update_orc_and_weights_iter_manager(npr, distance_matrix:list[list], graph:Hypergraph, targ_graph:Hypergraph,  iteration:int, verbose:bool, file_format='csv', op_flag = False):
@@ -769,6 +823,7 @@ def update_orc_and_weights_iter_manager(npr, distance_matrix:list[list], graph:H
             
                     
 def update_orc_and_weights_iter_worker():
+    print('worker update_orc')
     specs = COMM.recv(source = 0, tag = 44)
     if specs == -1: 
         return False
@@ -852,6 +907,7 @@ def calculate_target_orc_manager(npr, distance_matrix: list[list], graph:Hypergr
                 clock_time(f'gathered data from processor: {i}')
     return
 
+
 def calculate_target_orc_worker():
     specs = COMM.recv(source = 0, tag = 33)
     if specs == -1: 
@@ -869,61 +925,6 @@ def calculate_target_orc_worker():
             weight = graph.weights[hyperedge_id][-1]
             writer.writerow([hyperedge_id, normalized_orc, weight])  
     COMM.send((graph,jobs) , dest=0, tag=11)
-    return
-
-
-def ricci_normalizing(R: float)->float: 
-    '''
-    Using the normalization function sigma(R)/sigma(1) 
-    Where sigma(x) is the standard sigmoid function 1/(1+\exp(-x))
-
-    :param float R: the ORC value to be normalized 
-    :return float: The normalized ORC value
-    ''' 
-    # print(R)
-    return ((1 - np.exp(-1))/(1+ np.exp(-R)))
-
-
-def clean_output(verbose:bool) -> None:
-    '''puts all the files (other than the README) in the outputfiles/ folder into a subfolder
-
-    :param bool verbose: Can turn on to print the file names it has moved.
-    '''
-    files = os.listdir('outputfiles')
-    now = time.time()
-    if not os.path.isdir(f'outputfiles/{now}'):
-        os.makedirs(f'outputfiles/{now}')
-    for f in files:
-        if f=='README.md' or os.path.isdir(f'outputfiles/{f}'):
-            continue
-        else:
-            try:
-                os.rename(f'outputfiles/{f}', f'outputfiles/{now}/{f}')
-                if verbose:
-                    print(f'moving {f} to {now}/{f}')
-            except:
-                print(f'Had issues moving {f} to a new folder')
-    return
-
-
-def write_scorecard(line:str)-> None:
-    '''function used to write the key results to a scorecard (for posterity)
-
-    :param str line: text to be put onto the scorecard
-    '''    
-    with open('outputfiles/scorecard.txt', 'a+') as f:
-        f.write(line)
-        f.write('\n')
-
-        
-def clock_time(message:str)-> None:
-    '''Get the time from the start of the process and write it to the scorecard with some message
-
-    :param str message: The message to put before the time being spent
-    '''
-    now = time.time()
-    rt = now-start
-    write_scorecard(f'{message}: {rt}')
     return
 
         
@@ -1006,123 +1007,6 @@ def set_up_one_direction(src_graph:Hypergraph, targ_graph:Hypergraph, op_flag=Fa
     return target_distance_matrix, distance_matrix, missing_from_src, missing_from_targ
 
         
-def one_direction_of_work(src_graph:Hypergraph, targ_graph:Hypergraph, tot_its = 100, op_flag=False):
-    '''Find out if one direction converges from source to target
-
-    :param Hypergraph src_graph: The source graph
-    :param Hypergraph targ_graph: The target graph
-    :param int tot_its: the maximum number of steps it can take, defaults to 100
-    '''
-    print('working on distance matrices')
-    distance_matrix = src_graph.floyd_warshall()
-    matfilename = 'outputfiles/'
-    if op_flag: matfilename += 'op_'
-    matfilename += 'undirected_source_dist_fw.csv'
-    save_matrix_csv(distance_matrix, matfilename)
-    
-    clock_time('Time to make the source distance matrix')
-
-    target_distance_matrix = targ_graph.floyd_warshall()
-    matfilename = 'outputfiles/'
-    if op_flag: matfilename += 'op_'
-    matfilename += 'undirected_target_dist_fw.csv'
-    save_matrix_csv(target_distance_matrix, matfilename)
-    
-    clock_time('Time to make the target distance matrix')
-    
-    missing_from_src, missing_from_targ = [], []
-
-    if set(targ_graph.hyperedges) != set(src_graph.hyperedges):
-        # logging the edges that are different
-        missing_from_src = set(targ_graph.hyperedges) - set(src_graph.hyperedges)
-        missing_from_targ = set(src_graph.hyperedges) - set(targ_graph.hyperedges)
-        
-        print ('Taking care of missing edges')
-        # add edges that are in the target but not the source
-        # src_graph.add_missing_edges(targ_graph, verbose)
-        # targ_graph.add_missing_edges(src_graph, verbose)
-        src_graph.add_missing_edges_shortest_path(targ_graph, distance_matrix, verbose)
-        targ_graph.add_missing_edges_shortest_path(src_graph, target_distance_matrix, verbose)
-        
-        # recalculate the matrices
-        distance_matrix = src_graph.floyd_warshall()
-        
-        target_distance_matrix = targ_graph.floyd_warshall()
-
-    print('starting ricci curvature')
-
-    calculate_target_orc(target_distance_matrix, targ_graph, verbose, op_flag=op_flag)
-
-    clock_time('Time to calc target ORC')
-
-    update_orc_and_weights_iter(distance_matrix, src_graph, targ_graph, iteration=0, verbose=verbose, op_flag=op_flag)
-
-    clock_time('Time to calc source ORC')
-    
-    for i in range(1, tot_its + 1):
-        print('Working on itteration', i)
-        distance_matrix_i = src_graph.floyd_warshall()
-        # print(src_graph.weights)
-        if i>1:
-            if len(missing_from_src)> 0 or len(missing_from_targ)> 0:
-                # We're gonna to the reset here
-                src_graph.add_missing_edges_shortest_path(targ_graph, distance_matrix, verbose)
-                targ_graph.add_missing_edges_shortest_path(src_graph, target_distance_matrix, verbose)
-        
-        # print(src_graph.weights)        
-        update_orc_and_weights_iter(distance_matrix_i, src_graph, targ_graph, iteration=i, verbose=verbose, op_flag=op_flag)
-        clock_time(f'Time for ORC {i}')
-        
-        # if i == 4: quit()
-        # We will do a "reset" here
-        if len(missing_from_src)> 0 or len(missing_from_targ)> 0:
-            # We're gonna to the reset here
-            #first delete all the edges
-            for e in missing_from_src:
-                src_graph.remove_hyperedge(e)
-            for e in missing_from_targ:
-                targ_graph.remove_hyperedge(e)
-              
-        allstable = True
-        finustab = None
-        if i == 1: 
-            #TODO: fix this weirdness
-            # take care of the getting started case
-            continue
-        errorlist = []
-        for e in src_graph.hyperedges:
-            clist = src_graph.ricci_curvature[e]
-            old = clist[-2]
-            new = clist[-1]
-            if old != 0:
-                # error = abs((old-new)/old)
-                error = abs(old-new)
-            else: 
-                error = abs(old-new)
-            if error > 0.01:
-                # if verbose:
-                print('unstable for edge ', e, ' with error ', error)
-                finustab = e
-                allstable = False
-                break
-            errorlist.append(error)
-        # if np.average(errorlist) > 0.001:
-        #     #if verbose:
-        #     print('average error too high with error average of: ', np.average(errorlist))
-        # else:
-        if allstable:
-            print('STABILIZED! Source to target distance is ',i)
-            print(np.average(errorlist))
-            write_scorecard('\n\n----- Results -----')
-            write_scorecard(f'Source to target distance is {i}')
-            break
-    
-    if not allstable:
-        write_scorecard('Source to target did not stablize.')
-        print(src_graph.weights[finustab])
-
-    return
-
 def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100, op_flag=False):
     # One Direction of Work
     targ_distance_matrix, distance_matrix, missing_from_src, missing_from_targ = set_up_one_direction(src_graph, targ_graph, op_flag)
@@ -1193,10 +1077,13 @@ def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100, op_
     return 
     
 
-def one_direction_of_work_worker(tot_its = 100):    
-    while True:
+def one_direction_of_work_worker(tot_its = 100):   
+    calculate_target_orc_worker()
+    update_orc_and_weights_iter_worker() 
+    cont=True
+    while cont:
         cont = update_orc_and_weights_iter_worker()
-        if not cont: break
+        print(cont)
     return 
 
     
@@ -1220,33 +1107,33 @@ def manager(npr, verbose = True):
     
     clock_time('Time to read the data in seconds')
     
-    # if directed_flag:
-    #     source_graph = DirectedHypergraph()
-    #     target_graph = DirectedHypergraph()
-    # else:
-    #     source_graph = UndirectedHypergraph()
-    #     target_graph = UndirectedHypergraph() 
+    if directed_flag:
+        source_graph = DirectedHypergraph()
+        target_graph = DirectedHypergraph()
+    else:
+        source_graph = UndirectedHypergraph()
+        target_graph = UndirectedHypergraph() 
         
-    # print('building source')          
-    # source_graph.build_from_dataframe(data_source, verbose)
-    # print('building target')
-    # target_graph.build_from_dataframe(data_target, verbose)
+    print('building source')          
+    source_graph.build_from_dataframe(data_source, verbose)
+    print('building target')
+    target_graph.build_from_dataframe(data_target, verbose)
     
-    # clock_time('Time to build the graphs')
+    clock_time('Time to build the graphs')
     
-    # if not (source_graph.is_2_uniform() and target_graph.is_2_uniform()) :
-    #     print('This has not been fully fleshed out for hypergraphs. Please give a 2-uniform graph')
-    #     quit()
+    if not (source_graph.is_2_uniform() and target_graph.is_2_uniform()) :
+        print('This has not been fully fleshed out for hypergraphs. Please give a 2-uniform graph')
+        quit()
     
-    # early_analysis(source_graph, verbose)
-    # clock_time('Time to analyze graphs')
+    early_analysis(source_graph, verbose)
+    clock_time('Time to analyze graphs')
     
-    # # One Direction of Work
-    # one_direction_of_work_manager(npr, source_graph, target_graph)
+    # One Direction of Work
+    one_direction_of_work_manager(npr, source_graph, target_graph)
     
-    # clock_time('Time for source->target')
+    clock_time('Time for source->target')
 
-    # write_scorecard('\n')
+    write_scorecard('\n')
 
     # Go the other way
     print('Now checking Target to Source....')
@@ -1279,10 +1166,9 @@ def manager(npr, verbose = True):
 
 def worker(w, verbose = True):
     # quit()
-    calculate_target_orc_worker()
-    update_orc_and_weights_iter_worker()
     one_direction_of_work_worker()
     one_direction_of_work_worker()
+    
     print(f'Worker {w} gets to before the true statement')
     while True:
         specs = COMM.recv(source = 0, tag = 55)
