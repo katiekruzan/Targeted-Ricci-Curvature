@@ -332,7 +332,6 @@ class Hypergraph:
         
         for e in set(other_graph.hyperedges) - set(self.hyperedges):
             if isinstance(self, UndirectedHypergraph):
-                print(e,placeholder)
                 self.add_hyperedge(e, other_graph.hyperedges[e], [placeholder], verbose)
             #TODO: Implement for Directed
             
@@ -653,7 +652,6 @@ class DirectedHypergraph(Hypergraph):
         mu_A_in = {node: 0 for node in self.nodes}
         for node in tail_set:
             d_x_in = self.node_degree(node)[0]
-            # print('in',node, d_x_in)
             if d_x_in != 0:
                 mu_A_in[node] = 0
             else:
@@ -662,7 +660,6 @@ class DirectedHypergraph(Hypergraph):
         mu_B_out = {node: 0 for node in self.nodes}
         for node in head_set:
             d_x_out = self.node_degree(node)[1]
-            # print('out',node, d_x_out)
             if d_x_out != 0:
                 mu_B_out[node] = 0
             else:
@@ -721,7 +718,6 @@ def ricci_normalizing(R: float)->float:
     :param float R: the ORC value to be normalized 
     :return float: The normalized ORC value
     ''' 
-    # print(R)
     return ((1 - np.exp(-1))/(1+ np.exp(-R)))
 
 
@@ -808,12 +804,12 @@ def update_orc_and_weights_iter_manager(npr, distance_matrix:list[list], graph:H
                     else: 
                         SLICE = (edges[(jobcnt-1) * chunksize: jobcnt * chunksize], distance_matrix, graph, targ_graph, file_name, verbose, iteration)
                     COMM.send(SLICE, dest = i, tag=44)
-                    if True:
+                    if verbose:
                         print('-> manager sends job', jobcnt, 'to worker', i)
                 # receive the jobs // sync the graphs.
                 for i in range(1, npr):
                     newgraph, jobs = COMM.recv(source=i, tag=11)
-                    if True:
+                    if verbose:
                         print('-> manager received data from worker', i, 'number of jobs', len(jobs))
                     for e in jobs: #sync up the graph
                         graph.add_ricci_curvature(e, newgraph.ricci_curvature[e][-1])
@@ -823,7 +819,6 @@ def update_orc_and_weights_iter_manager(npr, distance_matrix:list[list], graph:H
             
                     
 def update_orc_and_weights_iter_worker():
-    print('worker update_orc')
     specs = COMM.recv(source = 0, tag = 44)
     if specs == -1: 
         return False
@@ -894,12 +889,12 @@ def calculate_target_orc_manager(npr, distance_matrix: list[list], graph:Hypergr
                 else: 
                     SLICE = (edges[(jobcnt-1) * chunksize: jobcnt * chunksize], distance_matrix, graph, file_name, verbose)
                 COMM.send(SLICE, dest = i, tag=33)
-                if True:
+                if verbose:
                     print('-> manager sends job', jobcnt, 'to worker', i)
             # receive the jobs // sync the graphs.
             for i in range(1, npr):
                 newgraph, jobs = COMM.recv(source=i, tag=11)
-                if True:
+                if verbose:
                     print('-> manager received data from worker', i, 'number of jobs', len(jobs))
                 for e in jobs: #sync up the graph
                     graph.add_ricci_curvature(e, newgraph.ricci_curvature[e][-1])
@@ -1024,7 +1019,6 @@ def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100, op_
     for i in range(1, tot_its + 1):
         print('Working on itteration', i)
         distance_matrix_i = src_graph.floyd_warshall()
-        print('finished floyd warshall')
         if i>1:
             if len(missing_from_src)> 0 or len(missing_from_targ)> 0:
                 # We're gonna to the reset here
@@ -1067,8 +1061,8 @@ def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100, op_
             errorlist.append(error)
         if allstable:
             #turn off all workers.
-            for i in range(1,npr):
-                COMM.send(-1, dest = i, tag = 44)
+            for k in range(1,npr):
+                COMM.send(-1, dest = k, tag = 44)
             print('STABILIZED! Source to target distance is ',i)
             print(np.average(errorlist))
             write_scorecard('\n\n----- Results -----')
@@ -1083,7 +1077,6 @@ def one_direction_of_work_worker(tot_its = 100):
     cont=True
     while cont:
         cont = update_orc_and_weights_iter_worker()
-        print(cont)
     return 
 
     
@@ -1160,20 +1153,18 @@ def manager(npr, verbose = True):
     for i in range(1, npr):
         SLICE = -33
         COMM.send(SLICE, dest = i, tag=55)
-        if True:
+        if verbose:
             print(f'-> manager sends {SLICE} to worker', i)
     return
 
 def worker(w, verbose = True):
-    # quit()
     one_direction_of_work_worker()
     one_direction_of_work_worker()
-    
-    print(f'Worker {w} gets to before the true statement')
     while True:
         specs = COMM.recv(source = 0, tag = 55)
         if specs == -33: 
-            print(f'Worker {w} goes to sleep')
+            if verbose:
+                print(f'Worker {w} goes to sleep')
             break
     return    
   
