@@ -1014,10 +1014,10 @@ if __name__ == "__main__":
     And the nodes must be labeled the same in both graphs for this to work
     '''
     start = time.time()
-    source_filename = 'petersen/petersengraph.csv'
-    target_filename = 'petersen/petersengraph_bigedges.csv'
-    # source_filename = 'ERgraph100nodep4.csv'
-    # target_filename = 'rangechanges/ERgraph100n5changev3range1000to2000.csv'
+    # source_filename = 'petersen/petersengraph.csv'
+    # target_filename = 'petersen/petersengraph_bigedges.csv'
+    source_filename = 'ERgraph100nodep4.csv'
+    target_filename = 'rangechanges/ERgraph100n5changev3range1000to2000.csv'
     # target_filename = 'ERgraph100nodep4_add10edges.csv'
     
     data_target = pd.read_csv(f'inputfiles/{target_filename}', dtype ={'source': str, 'target':str}, sep=',')  
