@@ -1048,12 +1048,17 @@ def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100, op_
             old = clist[-2]
             new = clist[-1]
             if old != 0:
-                # error = abs((old-new)/old)
-                error = abs(old-new)
+                if absolute_change: error = abs(old-new)
+                else: error = abs((old-new)/old) #relative change
             else: 
                 error = abs(old-new)
-            if error > 0.01:
+            if absolute_change and (error > 0.01):
                 # if verbose:
+                print('unstable for edge ', e, ' with error ', error)
+                finustab = e
+                allstable = False
+                break
+            if (not absolute_change) and (error > 0.05): # relative change
                 print('unstable for edge ', e, ' with error ', error)
                 finustab = e
                 allstable = False
@@ -1171,6 +1176,9 @@ def worker(w, verbose = True):
 if __name__ == "__main__": 
     directed_flag = False
     verbose = False
+    absolute_change = True # False is relative change
+    #TODO: implement max error vs average error
+    maximum_error = True # False is average error
     
     start = time.time()
     
