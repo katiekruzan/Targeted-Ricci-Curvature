@@ -805,7 +805,8 @@ def update_orc_and_weights_iter_manager(npr, distance_matrix:list[list], graph:H
                         SLICE = (edges[(jobcnt-1) * chunksize: jobcnt * chunksize], distance_matrix, graph, targ_graph, file_name, verbose, iteration)
                     COMM.send(SLICE, dest = i, tag=44)
                     if verbose:
-                        print('-> manager sends job', jobcnt, 'to worker', i)
+                        print('-> manager sends job', jobcnt, 'to worker', i, 'number of jobs', len(SLICE[0]))
+                clock_time(f'manager has sent all the jobs')
                 # receive the jobs // sync the graphs.
                 for i in range(1, npr):
                     newgraph, jobs = COMM.recv(source=i, tag=11)
@@ -876,9 +877,10 @@ def calculate_target_orc_manager(npr, distance_matrix: list[list], graph:Hypergr
             
         # split the edges. Just do it the simple way. Just have the last one take the rest
         edges = list(graph.hyperedges.keys())
-        njobs = len(graph.hyperedges)
+        njobs = len(edges)
         chunksize = njobs//(npr-1)
         jobcnt = 0
+        print('Number of jobs ', njobs)
         while jobcnt < npr-1:
             # send the jobs
             for i in range(1, npr):
@@ -889,12 +891,12 @@ def calculate_target_orc_manager(npr, distance_matrix: list[list], graph:Hypergr
                 else: 
                     SLICE = (edges[(jobcnt-1) * chunksize: jobcnt * chunksize], distance_matrix, graph, file_name, verbose)
                 COMM.send(SLICE, dest = i, tag=33)
-                if verbose:
-                    print('-> manager sends job', jobcnt, 'to worker', i)
+                if True:
+                    print('-> manager sends job', jobcnt, 'to worker', i, 'number of jobs', len(SLICE[0]))
             # receive the jobs // sync the graphs.
             for i in range(1, npr):
                 newgraph, jobs = COMM.recv(source=i, tag=11)
-                if verbose:
+                if True:
                     print('-> manager received data from worker', i, 'number of jobs', len(jobs))
                 for e in jobs: #sync up the graph
                     graph.add_ricci_curvature(e, newgraph.ricci_curvature[e][-1])
@@ -985,6 +987,7 @@ def set_up_one_direction(src_graph:Hypergraph, targ_graph:Hypergraph, op_flag=Fa
     missing_from_src, missing_from_targ = [], []
 
     if set(targ_graph.hyperedges) != set(src_graph.hyperedges):
+        print(set(targ_graph.hyperedges) - set(src_graph.hyperedges))
         # logging the edges that are different
         missing_from_src = set(targ_graph.hyperedges) - set(src_graph.hyperedges)
         missing_from_targ = set(src_graph.hyperedges) - set(targ_graph.hyperedges)
@@ -998,6 +1001,9 @@ def set_up_one_direction(src_graph:Hypergraph, targ_graph:Hypergraph, op_flag=Fa
         distance_matrix = src_graph.floyd_warshall()
         
         target_distance_matrix = targ_graph.floyd_warshall()
+    
+    print('len mising from source', len(missing_from_src))
+    print('len mising from targ', len(missing_from_targ))
     
     return target_distance_matrix, distance_matrix, missing_from_src, missing_from_targ
 
@@ -1019,6 +1025,7 @@ def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100, op_
     for i in range(1, tot_its + 1):
         print('Working on itteration', i)
         distance_matrix_i = src_graph.floyd_warshall()
+        clock_time(f'finished distance matrix {i}')
         if i>1:
             if len(missing_from_src)> 0 or len(missing_from_targ)> 0:
                 # We're gonna to the reset here
@@ -1086,9 +1093,11 @@ def manager(npr, verbose = True):
     
     # source_filename = 'petersen/petersengraph.csv'
     # target_filename = 'petersen/petersengraph_bigedges.csv'
-    source_filename = 'ERgraph100nodep4.csv'
+    source_filename = 'ERgraph500nodep4.csv'
+    # source_filename = 'ERgraph100nodep4.csv'
     # target_filename = 'ERgraph100n5changev3.csv'
-    target_filename = 'rangechanges/ERgraph100n5changev3range1000to2000.csv'
+    target_filename = 'rangechanges/ERgraph500n5changenewrange1000to2000v3.csv'
+    # target_filename = 'rangechanges/ERgraph100n5changev3range1000to2000.csv'
 
     data_target = pd.read_csv(f'inputfiles/{target_filename}', dtype ={'source': str, 'target':str}, sep=',')  
     data_source = pd.read_csv(f'inputfiles/{source_filename}', dtype ={'source': str, 'target':str}, sep=',')  
