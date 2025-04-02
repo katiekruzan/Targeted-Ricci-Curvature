@@ -798,14 +798,13 @@ def update_orc_and_weights_iter_manager(npr, distance_matrix:list[list], graph:H
             while jobcnt < npr-1:
                 # send the jobs
                 for i in range(1, npr):
-                    jobcnt = jobcnt + 1
                     jobcnt = jobcnt + 1 # notably, will basically be equal to i
                     jobstosend = []
                     if jobcnt <= remainder:
                         jobstosend = edges[(jobcnt-1) * chunksize:jobcnt * chunksize] + [edges[-jobcnt]]
                     else: 
                         jobstosend = edges[(jobcnt-1) * chunksize: jobcnt * chunksize]
-                    SLICE = (jobstosend, distance_matrix, graph, file_name, verbose)
+                    SLICE = (jobstosend, distance_matrix, graph, targ_graph, file_name, verbose, iteration)
                     COMM.send(SLICE, dest = i, tag=44)
                     if verbose:
                         print('-> manager sends job', jobcnt, 'to worker', i, 'number of jobs', len(SLICE[0]))
