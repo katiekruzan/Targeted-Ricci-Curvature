@@ -1069,11 +1069,13 @@ def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100, op_
                 finustab = e
                 allstable = False
                 break
-            if (not absolute_change) and (error > 0.05): # relative change
-                print('unstable for edge ', e, ' with error ', error)
-                finustab = e
-                allstable = False
-                break
+            if (not absolute_change): 
+                error = error / old
+                if (error > 0.05): # relative change
+                    print('unstable for edge ', e, ' with error ', error)
+                    finustab = e
+                    allstable = False
+                    break
             errorlist.append(error)
         if allstable:
             #turn off all workers.
