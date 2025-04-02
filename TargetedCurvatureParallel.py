@@ -1063,19 +1063,19 @@ def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100, op_
                 else: error = abs((old-new)/old) #relative change
             else: 
                 error = abs(old-new)
+            if (not absolute_change):
+                error = error / old
             if absolute_change and (error > 0.01):
                 # if verbose:
                 print('unstable for edge ', e, ' with error ', error)
                 finustab = e
                 allstable = False
                 break
-            if (not absolute_change): 
-                error = error / old
-                if (error > 0.05): # relative change
-                    print('unstable for edge ', e, ' with error ', error)
-                    finustab = e
-                    allstable = False
-                    break
+            if (not absolute_change) and (error > 0.05): # relative change
+                print('unstable for edge ', e, ' with error ', error)
+                finustab = e
+                allstable = False
+                break
             errorlist.append(error)
         if allstable:
             #turn off all workers.
@@ -1102,13 +1102,12 @@ def manager(npr, verbose = True):
     # starting off things
     clean_output(verbose)
     
-    # source_filename = 'petersen/petersengraph.csv'
-    # target_filename = 'petersen/petersengraph_bigedges.csv'
+    source_filename = 'petersen/petersengraph.csv'
+    target_filename = 'petersen/petersengraph_newbigweights.csv'
     # source_filename = 'ERgraph500nodep4.csv'
-    source_filename = 'ERgraph100nodep4.csv'
-    # target_filename = 'ERgraph100n5changev3.csv'
+    # source_filename = 'ERgraph100nodep4.csv'
     # target_filename = 'rangechanges/ERgraph500n5changenewrange1000to2000v3.csv'
-    target_filename = 'rangechanges/ERgraph100n5changenewrange5to10v3.csv'
+    # target_filename = 'rangechanges/ERgraph100n5changenewrange5to10v3.csv'
 
     data_target = pd.read_csv(f'inputfiles/{target_filename}', dtype ={'source': str, 'target':str}, sep=',')  
     data_source = pd.read_csv(f'inputfiles/{source_filename}', dtype ={'source': str, 'target':str}, sep=',')  
