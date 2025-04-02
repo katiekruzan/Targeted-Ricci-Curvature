@@ -1093,8 +1093,10 @@ def one_direction_of_work_worker(tot_its = 100):
     calculate_target_orc_worker()
     update_orc_and_weights_iter_worker() 
     cont=True
-    while cont:
+    cnt = 1
+    while cont and (cnt<tot_its):
         cont = update_orc_and_weights_iter_worker()
+        cnt = cnt + 1
     return 
 
     
