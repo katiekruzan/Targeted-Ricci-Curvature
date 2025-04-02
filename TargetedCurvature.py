@@ -2,7 +2,7 @@ import pandas as pd
 import csv
 import numpy as np
 from itertools import combinations
-from gurobipy import Model, GRB, quicksum, LinExpr
+from gurobipy import Model, GRB, quicksum, LinExpr, Env
 import time
 import os
 from numbers import Number
@@ -248,19 +248,24 @@ class Hypergraph:
         # Create a mapping of nodes to their indices in the distance matrix.
         node_to_index = self.node_index
         
+        env = Env()
+        env.setParam("OutputFlag",0)
+        env.start()
+        
         try:
             # Create a new model in Gurobi.
-            model = Model("EarthMoverDistance")
+            print('here')
+            model = Model("EarthMoverDistance", env=env)
+            print('got here')
+            # Make it less verbose
+            # model.Params.LogToConsole = 0   
             
             # Set up the log file
             # log_filename = f"gurobi_log_{data}.log"
             # model.setParam('LogFile', log_filename)
             
             # Create variables for the linear program.
-            variables = model.addVars(mu_A.keys(), mu_B.keys(), name="z", lb=0) 
-            
-            # Make it less verbose
-            model.Params.LogToConsole = 0          
+            variables = model.addVars(mu_A.keys(), mu_B.keys(), name="z", lb=0)        
             
             expr = LinExpr(3.0)
             expr.clear()
@@ -284,12 +289,16 @@ class Hypergraph:
             # Check the model status and process the results.
             if model.status == GRB.OPTIMAL:
                 total_cost = model.getObjective().getValue()
+                env.dispose()
+                model.dispose()
                 return total_cost
             else:
                 print(f"No optimal solution found for data {data}")
                 print(f"The probability distributions are A: {mu_A} \nAnd B: {mu_B}")
                 print('Model Status', model.status)
                 print(f"The masses are {total_mass_A} for A and {total_mass_B} for B")
+                env.dispose()
+                model.dispose()
                 return None
             
         except Exception as e:
@@ -1001,7 +1010,7 @@ if __name__ == "__main__":
     # try a network such that the sum of the two weights are the same
 
     directed_flag = False
-    verbose = False
+    verbose = True
      
     clean_output(verbose)
     
@@ -1014,10 +1023,10 @@ if __name__ == "__main__":
     And the nodes must be labeled the same in both graphs for this to work
     '''
     start = time.time()
-    # source_filename = 'petersen/petersengraph.csv'
-    # target_filename = 'petersen/petersengraph_bigedges.csv'
-    source_filename = 'ERgraph100nodep4.csv'
-    target_filename = 'rangechanges/ERgraph100n5changev3range1000to2000.csv'
+    source_filename = 'petersen/petersengraph.csv'
+    target_filename = 'petersen/petersengraph_newbigweights.csv'
+    # source_filename = 'ERgraph100nodep4.csv'
+    # target_filename = 'rangechanges/ERgraph100n5changenewrange5to10v3.csv'
     # target_filename = 'ERgraph100nodep4_add10edges.csv'
     
     data_target = pd.read_csv(f'inputfiles/{target_filename}', dtype ={'source': str, 'target':str}, sep=',')  

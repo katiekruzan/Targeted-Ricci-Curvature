@@ -792,17 +792,20 @@ def update_orc_and_weights_iter_manager(npr, distance_matrix:list[list], graph:H
             edges = list(graph.hyperedges.keys())
             njobs = len(graph.hyperedges)
             chunksize = njobs//(npr-1)
+            remainder = njobs % (npr-1)
             jobcnt = 0
             
             while jobcnt < npr-1:
                 # send the jobs
                 for i in range(1, npr):
                     jobcnt = jobcnt + 1
-                    SLICE = []
-                    if jobcnt == npr-1:
-                        SLICE = (edges[(jobcnt-1) * chunksize::], distance_matrix, graph, targ_graph, file_name, verbose, iteration)
+                    jobcnt = jobcnt + 1 # notably, will basically be equal to i
+                    jobstosend = []
+                    if jobcnt <= remainder:
+                        jobstosend = edges[(jobcnt-1) * chunksize:jobcnt * chunksize] + [edges[-jobcnt]]
                     else: 
-                        SLICE = (edges[(jobcnt-1) * chunksize: jobcnt * chunksize], distance_matrix, graph, targ_graph, file_name, verbose, iteration)
+                        jobstosend = edges[(jobcnt-1) * chunksize: jobcnt * chunksize]
+                    SLICE = (jobstosend, distance_matrix, graph, file_name, verbose)
                     COMM.send(SLICE, dest = i, tag=44)
                     if verbose:
                         print('-> manager sends job', jobcnt, 'to worker', i, 'number of jobs', len(SLICE[0]))
@@ -879,17 +882,19 @@ def calculate_target_orc_manager(npr, distance_matrix: list[list], graph:Hypergr
         edges = list(graph.hyperedges.keys())
         njobs = len(edges)
         chunksize = njobs//(npr-1)
+        remainder = njobs % (npr-1)
         jobcnt = 0
         print('Number of jobs ', njobs)
         while jobcnt < npr-1:
             # send the jobs
             for i in range(1, npr):
-                jobcnt = jobcnt + 1
-                SLICE = []
-                if jobcnt == npr-1:
-                    SLICE = (edges[(jobcnt-1) * chunksize::], distance_matrix, graph, file_name, verbose)
+                jobcnt = jobcnt + 1 # notably, will basically be equal to i
+                jobstosend = []
+                if jobcnt <= remainder:
+                    jobstosend = edges[(jobcnt-1) * chunksize:jobcnt * chunksize] + [edges[-jobcnt]]
                 else: 
-                    SLICE = (edges[(jobcnt-1) * chunksize: jobcnt * chunksize], distance_matrix, graph, file_name, verbose)
+                    jobstosend = edges[(jobcnt-1) * chunksize: jobcnt * chunksize]
+                SLICE = (jobstosend, distance_matrix, graph, file_name, verbose)
                 COMM.send(SLICE, dest = i, tag=33)
                 if True:
                     print('-> manager sends job', jobcnt, 'to worker', i, 'number of jobs', len(SLICE[0]))
@@ -1098,11 +1103,11 @@ def manager(npr, verbose = True):
     
     # source_filename = 'petersen/petersengraph.csv'
     # target_filename = 'petersen/petersengraph_bigedges.csv'
-    source_filename = 'ERgraph500nodep4.csv'
-    # source_filename = 'ERgraph100nodep4.csv'
+    # source_filename = 'ERgraph500nodep4.csv'
+    source_filename = 'ERgraph100nodep4.csv'
     # target_filename = 'ERgraph100n5changev3.csv'
-    target_filename = 'rangechanges/ERgraph500n5changenewrange1000to2000v3.csv'
-    # target_filename = 'rangechanges/ERgraph100n5changev3range1000to2000.csv'
+    # target_filename = 'rangechanges/ERgraph500n5changenewrange1000to2000v3.csv'
+    target_filename = 'rangechanges/ERgraph100n5changenewrange5to10v3.csv'
 
     data_target = pd.read_csv(f'inputfiles/{target_filename}', dtype ={'source': str, 'target':str}, sep=',')  
     data_source = pd.read_csv(f'inputfiles/{source_filename}', dtype ={'source': str, 'target':str}, sep=',')  
