@@ -303,12 +303,16 @@ class Hypergraph:
             # Check the model status and process the results.
             if model.status == GRB.OPTIMAL:
                 total_cost = model.getObjective().getValue()
+                model.dispose()
+                env.dispose()
                 return total_cost
             else:
                 print(f"No optimal solution found for data {data}")
                 print(f"The probability distributions are A: {mu_A} \nAnd B: {mu_B}")
                 print('Model Status', model.status)
                 print(f"The masses are {total_mass_A} for A and {total_mass_B} for B")
+                model.dispose()
+                env.dispose()
                 return None
             
         except Exception as e:
@@ -1068,11 +1072,13 @@ def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100, op_
             if absolute_change and (error > 0.01):
                 # if verbose:
                 print('unstable for edge ', e, ' with error ', error)
+                clock_time(f'unstable for edge {e} with error {error}')
                 finustab = e
                 allstable = False
                 break
             if (not absolute_change) and (error > 0.05): # relative change
                 print('unstable for edge ', e, ' with error ', error)
+                clock_time(f'unstable for edge {e} with error {error}')
                 finustab = e
                 allstable = False
                 break
@@ -1106,10 +1112,10 @@ def manager(npr, verbose = True):
     
     # source_filename = 'petersen/petersengraph.csv'
     # target_filename = 'petersen/petersengraph_newbigweights.csv'
-    # source_filename = 'ERgraph500nodep4.csv'
-    source_filename = 'ERgraph100nodep4.csv'
+    source_filename = 'ERgraph500nodep4.csv'
+    # source_filename = 'ERgraph100nodep4.csv'
     # target_filename = 'rangechanges/ERgraph500n5changenewrange1000to2000v3.csv'
-    target_filename = 'rangechanges/ERgraph100n5changenewrange5to10v3.csv'
+    target_filename = 'rangechanges/ERgraph500n500changenewrange1000to2000v3.csv'
 
     data_target = pd.read_csv(f'inputfiles/{target_filename}', dtype ={'source': str, 'target':str}, sep=',')  
     data_source = pd.read_csv(f'inputfiles/{source_filename}', dtype ={'source': str, 'target':str}, sep=',')  
@@ -1118,6 +1124,14 @@ def manager(npr, verbose = True):
     write_scorecard('----- Targeted Ricci Curvature -----')
     write_scorecard(f'target filename: {target_filename}')
     write_scorecard(f'source filename: {source_filename}')
+    if absolute_change:
+        write_scorecard('Absolute vs Relative change: absolute change')
+    else:
+        write_scorecard('Absolute vs Relative change: relative change')
+    if maximum_error:
+        write_scorecard('Max vs Avg error: Maximum')
+    else: 
+        write_scorecard('Max vs Avg error: Avg')
     
     clock_time('Time to read the data in seconds')
     
@@ -1143,7 +1157,7 @@ def manager(npr, verbose = True):
     clock_time('Time to analyze graphs')
     
     # One Direction of Work
-    one_direction_of_work_manager(npr, source_graph, target_graph)
+    one_direction_of_work_manager(npr, source_graph, target_graph, tot_its = ITS)
     
     clock_time('Time for source->target')
 
@@ -1165,7 +1179,7 @@ def manager(npr, verbose = True):
     print('building target')
     target_graph.build_from_dataframe(data_source, verbose)
     
-    one_direction_of_work_manager(npr, source_graph, target_graph, tot_its=100, op_flag = True)
+    one_direction_of_work_manager(npr, source_graph, target_graph, tot_its=ITS, op_flag = True)
       
     clock_time('Time for final')
     
@@ -1179,8 +1193,8 @@ def manager(npr, verbose = True):
     return
 
 def worker(w, verbose = True):
-    one_direction_of_work_worker()
-    one_direction_of_work_worker()
+    one_direction_of_work_worker(tot_its = ITS)
+    one_direction_of_work_worker(tot_its = ITS)
     while True:
         specs = COMM.recv(source = 0, tag = 55)
         if specs == -33: 
@@ -1192,7 +1206,7 @@ def worker(w, verbose = True):
 if __name__ == "__main__": 
     directed_flag = False
     verbose = False
-    absolute_change = True # False is relative change
+    absolute_change = False # False is relative change
     #TODO: implement max error vs average error
     maximum_error = True # False is average error
     
@@ -1200,6 +1214,7 @@ if __name__ == "__main__":
     
     RANK = COMM.Get_rank()
     SIZE = COMM.Get_size()
+    ITS = 100
     if RANK == 0:
         manager(SIZE, verbose=False)
     else: 
