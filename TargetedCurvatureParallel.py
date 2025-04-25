@@ -1069,7 +1069,6 @@ def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100, op_
                 error = abs(old-new)
                 if (not absolute_change):
                     error = error / old
-<<<<<<< HEAD
             if maximum_error:
                 if absolute_change and (error > 0.01):
                     # if verbose:
@@ -1092,22 +1091,6 @@ def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100, op_
                 print('unstable with average error ', avg_err)
                 finustab = e
                 allstable = False
-=======
-            if absolute_change and (error > 0.01):
-                # if verbose:
-                print('unstable for edge ', e, ' with error ', error)
-                clock_time(f'unstable for edge {e} with error {error}')
-                finustab = e
-                allstable = False
-                break
-            if (not absolute_change) and (error > 0.05): # relative change
-                print('unstable for edge ', e, ' with error ', error)
-                clock_time(f'unstable for edge {e} with error {error}')
-                finustab = e
-                allstable = False
-                break
-            errorlist.append(error)
->>>>>>> ff184efbcd3b36980a8efa9154b5a585834865c5
         if allstable:
             #turn off all workers.
             for k in range(1,npr):
@@ -1134,21 +1117,12 @@ def manager(npr, verbose = True):
     # starting off things
     clean_output(verbose)
     
-<<<<<<< HEAD
     source_filename = 'petersen/petersengraph.csv'
     target_filename = 'petersen/petersengraph_newbigweights.csv'
     # source_filename = 'ERgraph500nodep4.csv'
     # source_filename = 'ERgraph100nodep4.csv'
     # target_filename = 'rangechanges/ERgraph500n5changenewrange1000to2000v3.csv'
     # target_filename = 'rangechanges/ERgraph100n5changenewrange5to10v3.csv'
-=======
-    # source_filename = 'petersen/petersengraph.csv'
-    # target_filename = 'petersen/petersengraph_newbigweights.csv'
-    source_filename = 'ERgraph500nodep4.csv'
-    # source_filename = 'ERgraph100nodep4.csv'
-    # target_filename = 'rangechanges/ERgraph500n5changenewrange1000to2000v3.csv'
-    target_filename = 'rangechanges/ERgraph500n500changenewrange1000to2000v3.csv'
->>>>>>> ff184efbcd3b36980a8efa9154b5a585834865c5
 
     data_target = pd.read_csv(f'inputfiles/{target_filename}', dtype ={'source': str, 'target':str}, sep=',')  
     data_source = pd.read_csv(f'inputfiles/{source_filename}', dtype ={'source': str, 'target':str}, sep=',')  
