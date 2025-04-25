@@ -1065,24 +1065,33 @@ def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100, op_
                 error = abs(old-new)
                 if (not absolute_change):
                     error = error / old
-            if absolute_change and (error > 0.01):
-                # if verbose:
-                print('unstable for edge ', e, ' with error ', error)
+            if maximum_error:
+                if absolute_change and (error > 0.01):
+                    # if verbose:
+                    print('unstable for edge ', e, ' with error ', error)
+                    finustab = e
+                    allstable = False
+                    break
+                if (not absolute_change) and (error > 0.05): # relative change
+                    print('unstable for edge ', e, ' with error ', error)
+                    finustab = e
+                    allstable = False
+                    break
+            else:
+                errorlist.append(error)
+        #find the average error
+        if not maximum_error: # AKA we're in average error zone
+            # assumed to be in absolute error zone
+            avg_err = np.average(errorlist)
+            if avg_err > 0.01:
+                print('unstable with average error ', avg_err)
                 finustab = e
                 allstable = False
-                break
-            if (not absolute_change) and (error > 0.05): # relative change
-                print('unstable for edge ', e, ' with error ', error)
-                finustab = e
-                allstable = False
-                break
-            errorlist.append(error)
         if allstable:
             #turn off all workers.
             for k in range(1,npr):
                 COMM.send(-1, dest = k, tag = 44)
             print('STABILIZED! Source to target distance is ',i)
-            print(np.average(errorlist))
             write_scorecard('\n\n----- Results -----')
             write_scorecard(f'Source to target distance is {i}')
             break
@@ -1104,12 +1113,12 @@ def manager(npr, verbose = True):
     # starting off things
     clean_output(verbose)
     
-    # source_filename = 'petersen/petersengraph.csv'
-    # target_filename = 'petersen/petersengraph_newbigweights.csv'
+    source_filename = 'petersen/petersengraph.csv'
+    target_filename = 'petersen/petersengraph_newbigweights.csv'
     # source_filename = 'ERgraph500nodep4.csv'
-    source_filename = 'ERgraph100nodep4.csv'
+    # source_filename = 'ERgraph100nodep4.csv'
     # target_filename = 'rangechanges/ERgraph500n5changenewrange1000to2000v3.csv'
-    target_filename = 'rangechanges/ERgraph100n5changenewrange5to10v3.csv'
+    # target_filename = 'rangechanges/ERgraph100n5changenewrange5to10v3.csv'
 
     data_target = pd.read_csv(f'inputfiles/{target_filename}', dtype ={'source': str, 'target':str}, sep=',')  
     data_source = pd.read_csv(f'inputfiles/{source_filename}', dtype ={'source': str, 'target':str}, sep=',')  
