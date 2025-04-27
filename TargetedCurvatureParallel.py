@@ -1072,12 +1072,12 @@ def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100, op_
             if maximum_error:
                 if absolute_change and (error > 0.01):
                     # if verbose:
-                    print('unstable for edge ', e, ' with error ', error)
+                    clock_time(f'unstable for edge {e} with error {error}')
                     finustab = e
                     allstable = False
                     break
                 if (not absolute_change) and (error > 0.05): # relative change
-                    print('unstable for edge ', e, ' with error ', error)
+                    clock_time(f'unstable for edge {e} with error {error}')
                     finustab = e
                     allstable = False
                     break
@@ -1088,7 +1088,7 @@ def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100, op_
             # assumed to be in absolute error zone
             avg_err = np.average(errorlist)
             if avg_err > 0.01:
-                print('unstable with average error ', avg_err)
+                clock_time('unstable with average error {avg_error}')
                 finustab = e
                 allstable = False
         if allstable:
