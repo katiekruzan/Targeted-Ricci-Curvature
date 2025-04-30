@@ -1087,8 +1087,8 @@ def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100, op_
         if not maximum_error: # AKA we're in average error zone
             # assumed to be in absolute error zone
             avg_err = np.average(errorlist)
-            if avg_err > 0.01:
-                clock_time('unstable with average error {avg_error}')
+            if avg_err > 0.0001:
+                clock_time(f'unstable with average error {avg_err}')
                 finustab = e
                 allstable = False
         if allstable:
@@ -1117,12 +1117,12 @@ def manager(npr, verbose = True):
     # starting off things
     clean_output(verbose)
     
-    source_filename = 'petersen/petersengraph.csv'
-    target_filename = 'petersen/petersengraph_newbigweights.csv'
+    # source_filename = 'petersen/petersengraph.csv'
+    # target_filename = 'petersen/petersengraph_newbigweights.csv'
     # source_filename = 'ERgraph500nodep4.csv'
-    # source_filename = 'ERgraph100nodep4.csv'
+    source_filename = 'ERgraph100nodep4.csv'
     # target_filename = 'rangechanges/ERgraph500n5changenewrange1000to2000v3.csv'
-    # target_filename = 'rangechanges/ERgraph100n5changenewrange5to10v3.csv'
+    target_filename = 'rangechanges/ERgraph100n100changenewrange1000to2000v3.csv'
 
     data_target = pd.read_csv(f'inputfiles/{target_filename}', dtype ={'source': str, 'target':str}, sep=',')  
     data_source = pd.read_csv(f'inputfiles/{source_filename}', dtype ={'source': str, 'target':str}, sep=',')  
@@ -1215,7 +1215,7 @@ if __name__ == "__main__":
     verbose = False
     absolute_change = False # False is relative change
     #TODO: implement max error vs average error
-    maximum_error = True # False is average error
+    maximum_error = False # False is average error
     
     start = time.time()
     
