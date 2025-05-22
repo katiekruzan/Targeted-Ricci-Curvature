@@ -11,6 +11,7 @@ import networkx as nx
 now = time.time()
 
 class Hypergraph:
+    # NOTE: Should just be able to use networkx native set up?
     def __init__(self):       
         self.nodes = set()
         self.hyperedges = {}
@@ -32,27 +33,29 @@ def update_orc_and_weights_iter(hypergraph, dist_matrix, verbose=False):
     updated_weights = {}
 
     for hyperedge_id, nodes in hypergraph.hyperedges.items():
-        if len(nodes) < 2:
+        if len(nodes) < 2: #hyper edges with less than 2 edges
             continue
 
-        u, v = nodes[0], nodes[1]
+        u, v = nodes[0], nodes[1] # Notably will only work for graphs, not hyper graphs
         if u not in dist_matrix or v not in dist_matrix[u]:
             continue
 
-        d_uv = dist_matrix[u][v]
-        orc = 1 - d_uv / max_dist if max_dist > 0 else 0
+        d_uv = dist_matrix[u][v] # Is dist_matrix symmetric?
+        #TODO: This is in need of a major fix
+        orc = 1 - d_uv / max_dist if max_dist > 0 else 0 # This is not correct..
         hypergraph.add_ricci_curvature(hyperedge_id, orc)
 
-        normalized_orc = orc
+        normalized_orc = orc # we might need to actually normalize this.
         weight = hypergraph.weights[hyperedge_id]
         if weight != 0:
             step = 1
-            wtplus1 = weight * (1 - step * normalized_orc)
+            wtplus1 = weight * (1 - step * normalized_orc) # Unsure about this one. Would need to double check here.
         else:
             wtplus1 = weight
-
-        updated_weights[hyperedge_id] = max(wtplus1, 1e-4)
-
+            
+        # NOTE:The only thing here, is I *think* weights are allowed to be 0
+        updated_weights[hyperedge_id] = max(wtplus1, 1e-4)  
+        
     for hyperedge_id, new_weight in updated_weights.items():
         hypergraph.weights[hyperedge_id] = new_weight
 
@@ -64,6 +67,8 @@ def one_direction_of_work(source_file, verbose=False):
     for _ in range(100):
         dist_matrix = compute_distance_matrix(source_graph)
         update_orc_and_weights_iter(source_graph, dist_matrix, verbose)
+        
+    #TODO: This has no convergence check. Just running it 100 times. Will need to check for convergence
 
     final_dist_matrix = compute_distance_matrix(source_graph)
     return final_dist_matrix, source_graph
@@ -81,7 +86,7 @@ def build_graph_from_csv(path, hypergraph):
 
 def compute_distance_matrix(hypergraph):
     G = nx.Graph()
-    for edge_id, (u, v) in hypergraph.hyperedges.items():
+    for edge_id, (u, v) in hypergraph.hyperedges.items(): #this might take a while. Could you just copy this?
         G.add_edge(u, v, weight=hypergraph.weights[edge_id])
     return dict(nx.floyd_warshall(G, weight='weight'))
 
@@ -151,20 +156,23 @@ def solve_assignment(D1, D2):
 
 
 def main():
-    path1 = "G1.csv"
-    path2 = "G2.csv"
+    path1 = "inputfiles/G1.csv"
+    path2 = "inputfiles/G2.csv"
 
     dist_G1, G1 = one_direction_of_work(path1)
     dist_G2, G2 = one_direction_of_work(path2)
 
-    order_G1 = sorted(G1.nodes)
+    order_G1 = sorted(G1.nodes) # Might need to think through if there are different nodes? Otherwise, should just be able to use order_G1 for both?
     order_G2 = sorted(G2.nodes)
 
     D1 = build_distance_vectors(dist_G1, order_G1)
     D2 = build_distance_vectors(dist_G2, order_G2)
 
+    # I don't think we need to match them here. Since we have known node correspondence.
     mapping = solve_assignment(D1, D2)
 
+    #NOTE: The problem is we need to find a distance. So the mapping section should be moot. 
+    # In theory we're just finding the distance between the 2 vectors (which should be quick to compute w/ numpy or similar.)
     print("Alignment between G1 and G2:")
     for i, j in mapping:
         print(f"Node {order_G1[i]} in G1 matched to Node {order_G2[j]} in G2")
