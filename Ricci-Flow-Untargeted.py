@@ -116,7 +116,7 @@ class Hypergraph:
         
         return probability_distribution
     
-    def earthmover_distance_gurobi_distance_matrix(self, data, distance_matrix, verbose=True):
+    def earthmover_distance_gurobi_distance_matrix(self, data, distance_matrix, verbose=False):
         '''Trying to combine the two functions into one
         '''
         # error handling
@@ -151,9 +151,6 @@ class Hypergraph:
         if abs(total_mass_A - total_mass_B) > 1e-6:
             raise ValueError('The total mass of the distributions mu_A and mu_B are not equal.')
         
-        # Create a mapping of nodes to their indices in the distance matrix.
-        node_to_index = self.node_index
-        
         try:
             # Create a new model in Gurobi.
             model = Model("EarthMoverDistance")
@@ -167,17 +164,8 @@ class Hypergraph:
             expr = LinExpr(3.0)
             expr.clear()
             
-            # print('got here')
-            # quit()   
-            pprint.pp(distance_matrix[10])
-            print([x for x in mu_A])
             for x in mu_A:
                 for y in mu_B:
-                    print('AHHH')
-                    print(distance_matrix[x][y])
-                    print(variables[x,y])
-                    # print('HEY')
-                    # quit()
                     expr.addTerms(distance_matrix[x][y], variables[x,y])
                     
             
@@ -191,7 +179,6 @@ class Hypergraph:
             for y in mu_B:
                 model.addConstr(quicksum(variables[x, y] for x in mu_A) == mu_B[y], f"dirt_filling_{y}")
              
-            
             # Start the timer, solve the model, and calculate the time taken.
             model.optimize()
             
@@ -211,8 +198,8 @@ class Hypergraph:
             return None 
 
 
-def update_orc_and_weights_iter(hypergraph, dist_matrix, iteration, verbose=False):
-    file_name = f'outputfiles/dataset_targeted_curvature_iteration_{iteration}.csv'
+def update_orc_and_weights_iter(hypergraph, dist_matrix, iteration, graphname, verbose=False):
+    file_name = f'outputfiles/dataset_targeted_curvature_{graphname}_iteration_{iteration}.csv'
     # max_dist = max([dist for node_dists in dist_matrix.values() for dist in node_dists.values() if dist < float('inf')])
     updated_weights = {}
     
@@ -235,9 +222,6 @@ def update_orc_and_weights_iter(hypergraph, dist_matrix, iteration, verbose=Fals
             orc = 1 - hypergraph.earthmover_distance_gurobi_distance_matrix((u, v), dist_matrix) # This is not correct..
             hypergraph.add_ricci_curvature(hyperedge_id, orc)
             print(orc)
-            
-            print("got here")
-            quit()
 
             normalized_orc = orc # we might need to actually normalize this.
             weight = hypergraph.weights[hyperedge_id]
@@ -258,7 +242,7 @@ def update_orc_and_weights_iter(hypergraph, dist_matrix, iteration, verbose=Fals
         hypergraph.weights[hyperedge_id] = new_weight
 
 
-def one_direction_of_work(source_file, verbose=False):
+def one_direction_of_work(source_file, graphname, verbose=False):
     """
     Run Ricci flow a bunch of times and return the final dist matrix and graph
     """
@@ -271,7 +255,7 @@ def one_direction_of_work(source_file, verbose=False):
         dist_matrix = compute_distance_dict(source_graph)
         # pprint.pprint(dist_matrix)
         # quit()
-        update_orc_and_weights_iter(source_graph, dist_matrix, i, verbose)
+        update_orc_and_weights_iter(source_graph, dist_matrix, i, graphname, verbose)
         clock_time(f'Time for ORC {i}')
         # quit()
     
@@ -282,13 +266,13 @@ def one_direction_of_work(source_file, verbose=False):
 
 
 def build_graph_from_csv(path, hypergraph):
-    df = pd.read_csv(path, header=None)
+    df = pd.read_csv(path)
     for _, row in df.iterrows():
-        u, v = int(row[0]), int(row[1])
+        u, v, weight = str(row[0]), str(row[1]), float(row[2])
         edge_id = f"{u}-{v}"
         hypergraph.nodes.update([u, v])
         hypergraph.hyperedges[edge_id] = [u, v]
-        hypergraph.weights[edge_id] = 1.0
+        hypergraph.weights[edge_id] = weight
 
 
 def compute_distance_dict(hypergraph):
@@ -379,8 +363,8 @@ def main():
     
     clean_output(False)
     
-    path1 = "inputfiles/G1.csv"
-    path2 = "inputfiles/G2.csv"
+    path1 = "inputfiles/petersen/petersengraph.csv"
+    path2 = "inputfiles/petersen/petersengraph_newbigweights.csv"
     
     # Scorecard Writing
     write_scorecard('----- Targeted Ricci Curvature -----')
@@ -389,9 +373,9 @@ def main():
     
     clock_time('Time to read the data in seconds')
 
-    # dist_G1, G1 = one_direction_of_work(path1)
+    dist_G1, G1 = one_direction_of_work(path1, "G1")
     write_scorecard('Finished the first graph')
-    dist_G2, G2 = one_direction_of_work(path2)
+    dist_G2, G2 = one_direction_of_work(path2, "G2")
     write_scorecard('Finished the second graph')
     
     print('Got here fine.')
