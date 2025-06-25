@@ -2,7 +2,7 @@ import pandas as pd
 import csv
 import numpy as np
 from itertools import combinations
-from gurobipy import Model, GRB, quicksum, LinExpr
+from gurobipy import Model, GRB, quicksum, LinExpr,Env
 import time
 import os
 from numbers import Number
@@ -22,6 +22,9 @@ class Hypergraph:
 
     def add_node(self, node: any) -> None:
         self.nodes.add(node)
+        
+    def get_total_weight(self):
+        return sum(self.weights.values())
 
     def add_ricci_curvature(self, hyperedge_id: str, orc: float) -> None:
         if hyperedge_id not in self.ricci_curvature:
@@ -151,15 +154,19 @@ class Hypergraph:
         if abs(total_mass_A - total_mass_B) > 1e-6:
             raise ValueError('The total mass of the distributions mu_A and mu_B are not equal.')
         
+        env = Env()
+        env.setParam("OutputFlag",0)
+        env.start()
+        
         try:
             # Create a new model in Gurobi.
-            model = Model("EarthMoverDistance")
+            model = Model("EarthMoverDistance", env=env)
             
             # Create variables for the linear program.
             variables = model.addVars(mu_A.keys(), mu_B.keys(), name="z", lb=0) 
             
-            # Make it less verbose
-            model.Params.LogToConsole = 0    
+            # # Make it less verbose
+            # model.Params.LogToConsole = 0    
             
             expr = LinExpr(3.0)
             expr.clear()
@@ -198,10 +205,13 @@ class Hypergraph:
             return None 
 
 
-def update_orc_and_weights_iter(hypergraph, dist_matrix, iteration, graphname, verbose=False):
+def update_orc_and_weights_iter(hypergraph:Hypergraph, dist_matrix, iteration, graphname, verbose=False):
     file_name = f'outputfiles/dataset_targeted_curvature_{graphname}_iteration_{iteration}.csv'
     # max_dist = max([dist for node_dists in dist_matrix.values() for dist in node_dists.values() if dist < float('inf')])
     updated_weights = {}
+    # NOTE: for right now am going to make this 1
+    # totweight = hypergraph.get_total_weight() 
+    totweight = 1.0
     
     with open(file_name, 'a', newline='') as file:
         writer = csv.writer(file)
@@ -220,26 +230,33 @@ def update_orc_and_weights_iter(hypergraph, dist_matrix, iteration, graphname, v
             #TODO: This is in need of a major fix
             # need 1- EMD
             orc = 1 - hypergraph.earthmover_distance_gurobi_distance_matrix((u, v), dist_matrix) # This is not correct..
-            hypergraph.add_ricci_curvature(hyperedge_id, orc)
-            print(orc)
+            # Normalize the curvature
+            normalized_orc = ricci_normalizing(orc)
+            print(f'Edge {hyperedge_id} with ORC {orc}\nNormalized ORC: {normalized_orc}')
+            
+            hypergraph.add_ricci_curvature(hyperedge_id, normalized_orc)
 
-            normalized_orc = orc # we might need to actually normalize this.
             weight = hypergraph.weights[hyperedge_id]
             if iteration != 0:
                 if weight != 0:
                     step = 1
-                    wtplus1 = weight * (1 - step * normalized_orc) # Unsure about this one. Would need to double check here.
+                    wtplus1 = weight * (1 - step * normalized_orc) 
                 else:
                     wtplus1 = weight
                     
                 # NOTE:The only thing here, is I *think* weights are allowed to be 0
                 updated_weights[hyperedge_id] = max(wtplus1, 1e-4) 
-            else: wtplus1 = weight
-            writer.writerow([hyperedge_id, normalized_orc, wtplus1])
+            else: updated_weights[hyperedge_id] = weight
         
-    for hyperedge_id, new_weight in updated_weights.items():
-        # NOTE: Deleting old weights. which probably makes sense. Other than to check convergence maybe
-        hypergraph.weights[hyperedge_id] = new_weight
+        for hyperedge_id, new_weight in updated_weights.items():
+            # Will also normalize the weights
+            newtotwt = sum(updated_weights.values())
+            normfactor = totweight/newtotwt
+            normalized_wt = normfactor * new_weight
+            writer.writerow([hyperedge_id, hypergraph.ricci_curvature[hyperedge_id][-1], normalized_wt])
+            # NOTE: Deleting old weights. which probably makes sense. Other than to check convergence maybe
+            hypergraph.weights[hyperedge_id] = normalized_wt
+    
 
 
 def one_direction_of_work(source_file, graphname, verbose=False):
@@ -257,6 +274,48 @@ def one_direction_of_work(source_file, graphname, verbose=False):
         # quit()
         update_orc_and_weights_iter(source_graph, dist_matrix, i, graphname, verbose)
         clock_time(f'Time for ORC {i}')
+        # if i == 2:
+        #     quit()
+        
+        allstable = True
+        if i <2: 
+            # Take care of the getting started case
+            continue
+        errorlist = []
+        for e in source_graph.hyperedges:
+            clist = source_graph.ricci_curvature[e]
+            old = clist[-2]
+            new = clist[-1]
+            if old != 0:
+                if absolute_change: error = abs(old-new)
+                else: error = abs((old-new)/old) #relative change
+            else: 
+                error = abs(old-new)
+                if (not absolute_change):
+                    error = error / old
+            if maximum_error:
+                if absolute_change and (error > 0.01):
+                    # if verbose:
+                    clock_time(f'unstable for edge {e} with error {error}')
+                    allstable = False
+                    break
+                if (not absolute_change) and (error > 0.05): # relative change
+                    clock_time(f'unstable for edge {e} with error {error}')
+                    allstable = False
+                    break
+            else:
+                errorlist.append(error)
+        if not maximum_error: # AKA we're in average error zone
+            # assumed to be in absolute error zone
+            avg_err = np.average(errorlist)
+            if avg_err > 0.0001:
+                clock_time(f'unstable with average error {avg_err}')
+                allstable = False
+        if allstable:
+            print('STABILIZED! Source to target distance is ',i)
+            write_scorecard('\n\n----- Results -----')
+            write_scorecard(f'Source to target distance is {i}')
+            break
         # quit()
     
     #TODO: This has no convergence check. Just running it 100 times. Will need to check for convergence
@@ -290,31 +349,6 @@ def build_distance_vectors(dist_dict, nodes_order):
         vectors.append(vec)
     return np.array(vectors)
 
-
-# def earthmover_distance_gurobi_distance_matrix(a, b):
-#     assert len(a) == len(b), "Vectors must be the same length"
-#     n = len(a)
-
-#     model = Model("emd")
-#     model.setParam('OutputFlag', 0)
-
-#     f = {}
-#     for i in range(n):
-#         for j in range(n):
-#             f[i, j] = model.addVar(lb=0, name=f"f_{i}_{j}")
-
-#     model.update()
-
-#     for i in range(n):
-#         model.addConstr(quicksum(f[i, j] for j in range(n)) == a[i])
-#     for j in range(n):
-#         model.addConstr(quicksum(f[i, j] for i in range(n)) == b[j])
-
-#     cost_expr = quicksum(abs(i - j) * f[i, j] for i in range(n) for j in range(n))
-#     model.setObjective(cost_expr, GRB.MINIMIZE)
-#     model.optimize()
-
-    # return model.ObjVal
 
 def clean_output(verbose:bool) -> None:
     '''puts all the files (other than the README) in the outputfiles/ folder into a subfolder
@@ -358,6 +392,17 @@ def clock_time(message:str)-> None:
     write_scorecard(f'{message}: {rt}')
     return
 
+def ricci_normalizing(R: float)->float: 
+    '''
+    Using the normalization function sigma(R)/sigma(1) 
+    Where sigma(x) is the standard sigmoid function 1/(1+\exp(-x))
+
+    :param float R: the ORC value to be normalized 
+    :return float: The normalized ORC value
+    ''' 
+    # print(R)
+    return ((1 - np.exp(-1))/(1+ np.exp(-R)))
+
 
 def main():
     
@@ -373,19 +418,23 @@ def main():
     
     clock_time('Time to read the data in seconds')
 
-    dist_G1, G1 = one_direction_of_work(path1, "G1")
+    # dist_G1, G1 = one_direction_of_work(path1, "G1")
     write_scorecard('Finished the first graph')
     dist_G2, G2 = one_direction_of_work(path2, "G2")
     write_scorecard('Finished the second graph')
     
     print('Got here fine.')
-    quit()
+    # quit()
 
     order_G1 = sorted(G1.nodes) # Might need to think through if there are different nodes? Otherwise, should just be able to use order_G1 for both?
     order_G2 = sorted(G2.nodes)
 
     D1 = build_distance_vectors(dist_G1, order_G1)
     D2 = build_distance_vectors(dist_G2, order_G2)
+    print(D1)
+    print(D2)
+    
+    print(np.linalg.norm(D1 - D2))
 
     # I don't think we need to match them here. Since we have known node correspondence.
     # mapping = solve_assignment(D1, D2)
@@ -398,7 +447,10 @@ def main():
 
 
 if __name__ == "__main__":
-    ITTS = 5
+    ITTS = 10
     start = time.time()
+    
+    absolute_change = True # False is relative change
+    maximum_error = True # False is average error
     
     main()

@@ -2,7 +2,7 @@ import pandas as pd
 import csv
 import numpy as np
 from itertools import combinations
-from gurobipy import Model, GRB, quicksum, LinExpr
+from gurobipy import Model, GRB, quicksum, LinExpr, Env
 import time
 import os
 from numbers import Number
@@ -248,9 +248,13 @@ class Hypergraph:
         # Create a mapping of nodes to their indices in the distance matrix.
         node_to_index = self.node_index
         
+        env = Env()
+        env.setParam("OutputFlag",0)
+        env.start()
+        
         try:
             # Create a new model in Gurobi.
-            model = Model("EarthMoverDistance")
+            model = Model("EarthMoverDistance", env=env)
             
             # Set up the log file
             # log_filename = f"gurobi_log_{data}.log"
