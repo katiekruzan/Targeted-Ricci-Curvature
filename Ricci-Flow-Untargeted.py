@@ -252,7 +252,8 @@ def update_orc_and_weights_iter(hypergraph:Hypergraph, dist_matrix, iteration, g
             # Will also normalize the weights
             newtotwt = sum(updated_weights.values())
             normfactor = totweight/newtotwt
-            normalized_wt = normfactor * new_weight
+            # normalized_wt = normfactor * new_weight
+            normalized_wt = new_weight
             writer.writerow([hyperedge_id, hypergraph.ricci_curvature[hyperedge_id][-1], normalized_wt])
             # NOTE: Deleting old weights. which probably makes sense. Other than to check convergence maybe
             hypergraph.weights[hyperedge_id] = normalized_wt
@@ -418,7 +419,7 @@ def main():
     
     clock_time('Time to read the data in seconds')
 
-    # dist_G1, G1 = one_direction_of_work(path1, "G1")
+    dist_G1, G1 = one_direction_of_work(path1, "G1")
     write_scorecard('Finished the first graph')
     dist_G2, G2 = one_direction_of_work(path2, "G2")
     write_scorecard('Finished the second graph')
