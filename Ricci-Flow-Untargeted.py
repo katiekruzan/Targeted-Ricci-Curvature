@@ -232,7 +232,7 @@ def update_orc_and_weights_iter(hypergraph:Hypergraph, dist_matrix, iteration, g
             orc = 1 - hypergraph.earthmover_distance_gurobi_distance_matrix((u, v), dist_matrix) # This is not correct..
             # Normalize the curvature
             normalized_orc = ricci_normalizing(orc)
-            print(f'Edge {hyperedge_id} with ORC {orc}\nNormalized ORC: {normalized_orc}')
+            # print(f'Edge {hyperedge_id} with ORC {orc}\nNormalized ORC: {normalized_orc}')
             
             hypergraph.add_ricci_curvature(hyperedge_id, normalized_orc)
 
@@ -271,8 +271,6 @@ def one_direction_of_work(source_file, graphname, verbose=False):
 
     for i in range(ITTS):
         dist_matrix = compute_distance_dict(source_graph)
-        # pprint.pprint(dist_matrix)
-        # quit()
         update_orc_and_weights_iter(source_graph, dist_matrix, i, graphname, verbose)
         clock_time(f'Time for ORC {i}')
         # if i == 2:
@@ -329,7 +327,7 @@ def build_graph_from_csv(path, hypergraph):
     df = pd.read_csv(path)
     for _, row in df.iterrows():
         u, v, weight = str(row[0]), str(row[1]), float(row[2])
-        edge_id = f"{u}-{v}"
+        edge_id = f"{u}_to_{v}"
         hypergraph.nodes.update([u, v])
         hypergraph.hyperedges[edge_id] = [u, v]
         hypergraph.weights[edge_id] = weight
@@ -401,7 +399,6 @@ def ricci_normalizing(R: float)->float:
     :param float R: the ORC value to be normalized 
     :return float: The normalized ORC value
     ''' 
-    # print(R)
     return ((1 - np.exp(-1))/(1+ np.exp(-R)))
 
 
@@ -409,33 +406,52 @@ def main():
     
     clean_output(False)
     
-    path1 = "inputfiles/petersen/petersengraph.csv"
-    path2 = "inputfiles/petersen/petersengraph_newbigweights.csv"
+    path1 = "inputfiles/ERgraph100nodep4.csv"
+    path2 = "inputfiles/rangechanges/ERgraph100n5changenewrange5to10v3.csv"
     
     # Scorecard Writing
     write_scorecard('----- Targeted Ricci Curvature -----')
-    write_scorecard(f'target filename: {path1}')
-    write_scorecard(f'source filename: {path2}')
+    write_scorecard(f'Graph 1 filename: {path1}')
+    write_scorecard(f'Graph 2 filename: {path2}')
+    
+    if absolute_change:
+        write_scorecard('Absolute vs Relative change: absolute change')
+    else:
+        write_scorecard('Absolute vs Relative change: relative change')
+    if maximum_error:
+        write_scorecard('Max vs Avg error: Maximum')
+    else: 
+        write_scorecard('Max vs Avg error: Avg')
     
     clock_time('Time to read the data in seconds')
 
-    dist_G1, G1 = one_direction_of_work(path1, "G1")
+    dist_G1, G1 = one_direction_of_work(path1, "Graph1")
     write_scorecard('Finished the first graph')
-    dist_G2, G2 = one_direction_of_work(path2, "G2")
+    dist_G2, G2 = one_direction_of_work(path2, "Graph2")
     write_scorecard('Finished the second graph')
-    
-    print('Got here fine.')
-    # quit()
 
     order_G1 = sorted(G1.nodes) # Might need to think through if there are different nodes? Otherwise, should just be able to use order_G1 for both?
-    order_G2 = sorted(G2.nodes)
+    # order_G2 = sorted(G2.nodes)
 
     D1 = build_distance_vectors(dist_G1, order_G1)
-    D2 = build_distance_vectors(dist_G2, order_G2)
-    print(D1)
-    print(D2)
+    D2 = build_distance_vectors(dist_G2, order_G1)
+    #TODO: Persist the ending vectors
+    np.savetxt("outputfiles/Graph1FinalDistance.txt", D1, delimiter=" ", fmt="%f")  
+    np.savetxt("outputfiles/Graph2FinalDistance.txt", D2, delimiter=" ", fmt="%f")  
+    # print(D1)
+    # print(D2)
     
-    print(np.linalg.norm(D1 - D2))
+    write_scorecard('The final distance:')
+    write_scorecard(str(np.linalg.norm(D1 - D2)))
+    write_scorecard("New Distance")
+    dist = 0
+    for v in range(len(D1)):
+        top = np.dot(D1[v], D2[v])
+        bot = np.linalg.norm(D1) * np.linalg.norm(D2)
+        print(top/bot)
+        dist = dist + (top/bot)
+    write_scorecard(str(dist))
+    # print(np.linalg.norm(D1 - D2))
 
     # I don't think we need to match them here. Since we have known node correspondence.
     # mapping = solve_assignment(D1, D2)
@@ -448,7 +464,7 @@ def main():
 
 
 if __name__ == "__main__":
-    ITTS = 10
+    ITTS = 100
     start = time.time()
     
     absolute_change = True # False is relative change
