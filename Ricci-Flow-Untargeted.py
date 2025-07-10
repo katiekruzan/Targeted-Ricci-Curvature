@@ -407,7 +407,7 @@ def main():
     clean_output(False)
     
     path1 = "inputfiles/ERgraph100nodep4.csv"
-    path2 = "inputfiles/rangechanges/ERgraph100n5changenewrange5to10v3.csv"
+    path2 = "inputfiles/ERgraph100n100changenewrange1000to2000v3.csv"
     
     # Scorecard Writing
     write_scorecard('----- Targeted Ricci Curvature -----')
@@ -448,7 +448,7 @@ def main():
     for v in range(len(D1)):
         top = np.dot(D1[v], D2[v])
         bot = np.linalg.norm(D1) * np.linalg.norm(D2)
-        print(top/bot)
+        # print(top/bot)
         dist = dist + (top/bot)
     write_scorecard(str(dist))
     # print(np.linalg.norm(D1 - D2))
@@ -467,7 +467,7 @@ if __name__ == "__main__":
     ITTS = 100
     start = time.time()
     
-    absolute_change = True # False is relative change
+    absolute_change = False # False is relative change
     maximum_error = True # False is average error
     
     main()
