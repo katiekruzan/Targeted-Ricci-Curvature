@@ -225,18 +225,40 @@ def update_orc_and_weights_iter(hypergraph:Hypergraph, dist_matrix, iteration, g
             u, v = nodes[0], nodes[1] # Notably will only work for graphs, not hyper graphs
             if u not in dist_matrix or v not in dist_matrix[u]:
                 continue
-
-            # d_uv = dist_matrix[u][v] # Is dist_matrix symmetric?
-            #TODO: This is in need of a major fix
-            # need 1- EMD
-            orc = 1 - hypergraph.earthmover_distance_gurobi_distance_matrix((u, v), dist_matrix) # This is not correct..
+            
+            orc = 0
+            weight = hypergraph.weights[hyperedge_id]
+            if approx_emd: #using the bounds in the Weighted version of the CurveGad paper (1/2 of those two)
+                # find the number of common neighbors
+                Nu = hypergraph.neighbours(u)
+                Nv = hypergraph.neighbours(v)
+                du = len(Nv)
+                dv = len(Nv)
+                commonNeighbors = Nu.intersection(Nv)
+                mins =[]
+                maxs =[]
+                
+                for n in commonNeighbors:
+                    uEdges = hypergraph.find_hyperedges_containing_nodes(n,u)
+                    vEdges = hypergraph.find_hyperedges_containing_nodes(n,v)
+                    for nu_id in uEdges:
+                        for nv_id in vEdges:
+                            mins.append(min(hypergraph.weights[nu_id]/du, hypergraph.weights[nv_id]/dv))
+                            maxs.append(max(hypergraph.weights[nu_id]/du, hypergraph.weights[nv_id]/dv)) 
+                
+                low = -min((1 - (weight/du) - (weight/dv) - sum(maxs)), 0) - min((1 - (weight/du) - (weight/dv) - sum(mins)), 0) + (sum(mins))
+                high = sum(mins)
+                orc = (low + high)/2
+            else:    
+                orc = 1 - hypergraph.earthmover_distance_gurobi_distance_matrix((u, v), dist_matrix) # This is not correct..
+            
             # Normalize the curvature
             normalized_orc = ricci_normalizing(orc)
             # print(f'Edge {hyperedge_id} with ORC {orc}\nNormalized ORC: {normalized_orc}')
             
             hypergraph.add_ricci_curvature(hyperedge_id, normalized_orc)
 
-            weight = hypergraph.weights[hyperedge_id]
+            
             if iteration != 0:
                 if weight != 0:
                     step = 1
@@ -469,5 +491,6 @@ if __name__ == "__main__":
     
     absolute_change = False # False is relative change
     maximum_error = True # False is average error
+    approx_emd = True
     
     main()
