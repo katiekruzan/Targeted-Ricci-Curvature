@@ -5,9 +5,7 @@ from itertools import combinations
 from gurobipy import Model, GRB, quicksum, LinExpr,Env
 import time
 import os
-from numbers import Number
 import networkx as nx
-import pprint
 
 # now = time.time()
 
@@ -124,10 +122,36 @@ class Hypergraph:
         '''
         # error handling
         # check data is node A node B
-        node_A, node_B = data
+        node_A, node_B, hyperedge_id = data
         if node_A not in self.nodes or node_B not in self.nodes:
             print(f"Node {node_A} or {node_B} does not exist in the Undirected hypergraph.")
             return None  # Return None if either node does not exist
+        
+        if approx_emd:
+            weight = self.weights[hyperedge_id] 
+            Na = self.neighbours(node_A)
+            Nb = self.neighbours(node_B)
+            da = len(Na)
+            db = len(Nb)
+            commonNeighbors = Na.intersection(Nb)
+            mins =[]
+            maxs =[]
+            
+            for n in commonNeighbors:
+                aEdges = self.find_hyperedges_containing_nodes(n,node_A)
+                bEdges = self.find_hyperedges_containing_nodes(n,node_B)
+                for na_id in aEdges:
+                    for nb_id in bEdges:
+                        naw = self.weights[na_id]
+                        nbw = self.weights[nb_id]
+                        mins.append(min(naw/da, nbw/db))
+                        maxs.append(max(naw/da, nbw/db)) 
+            
+            low = - min((1 - (weight/da) - (weight/db) - sum(maxs)), 0) - min((1 - (weight/da) - (weight/db) - sum(mins)), 0) + (sum(mins))
+            high = sum(mins)
+            orc = (low + high)/2
+            return 1-orc
+        
         mu_A = self.node_probability(node_A)
         mu_B = self.node_probability(node_B)
         
@@ -226,31 +250,7 @@ def update_orc_and_weights_iter(hypergraph:Hypergraph, dist_matrix, iteration, g
             if u not in dist_matrix or v not in dist_matrix[u]:
                 continue
             
-            orc = 0
-            weight = hypergraph.weights[hyperedge_id]
-            if approx_emd: #using the bounds in the Weighted version of the CurveGad paper (1/2 of those two)
-                # find the number of common neighbors
-                Nu = hypergraph.neighbours(u)
-                Nv = hypergraph.neighbours(v)
-                du = len(Nv)
-                dv = len(Nv)
-                commonNeighbors = Nu.intersection(Nv)
-                mins =[]
-                maxs =[]
-                
-                for n in commonNeighbors:
-                    uEdges = hypergraph.find_hyperedges_containing_nodes(n,u)
-                    vEdges = hypergraph.find_hyperedges_containing_nodes(n,v)
-                    for nu_id in uEdges:
-                        for nv_id in vEdges:
-                            mins.append(min(hypergraph.weights[nu_id]/du, hypergraph.weights[nv_id]/dv))
-                            maxs.append(max(hypergraph.weights[nu_id]/du, hypergraph.weights[nv_id]/dv)) 
-                
-                low = -min((1 - (weight/du) - (weight/dv) - sum(maxs)), 0) - min((1 - (weight/du) - (weight/dv) - sum(mins)), 0) + (sum(mins))
-                high = sum(mins)
-                orc = (low + high)/2
-            else:    
-                orc = 1 - hypergraph.earthmover_distance_gurobi_distance_matrix((u, v), dist_matrix) # This is not correct..
+            orc = 1 - hypergraph.earthmover_distance_gurobi_distance_matrix((u, v, hyperedge_id), dist_matrix) # This is not correct..
             
             # Normalize the curvature
             normalized_orc = ricci_normalizing(orc)
@@ -258,7 +258,7 @@ def update_orc_and_weights_iter(hypergraph:Hypergraph, dist_matrix, iteration, g
             
             hypergraph.add_ricci_curvature(hyperedge_id, normalized_orc)
 
-            
+            weight = hypergraph.weights[hyperedge_id] 
             if iteration != 0:
                 if weight != 0:
                     step = 1
@@ -267,7 +267,7 @@ def update_orc_and_weights_iter(hypergraph:Hypergraph, dist_matrix, iteration, g
                     wtplus1 = weight
                     
                 # NOTE:The only thing here, is I *think* weights are allowed to be 0
-                updated_weights[hyperedge_id] = max(wtplus1, 1e-4) 
+                updated_weights[hyperedge_id] = max(wtplus1, 1e-8) 
             else: updated_weights[hyperedge_id] = weight
         
         for hyperedge_id, new_weight in updated_weights.items():
@@ -295,8 +295,6 @@ def one_direction_of_work(source_file, graphname, verbose=False):
         dist_matrix = compute_distance_dict(source_graph)
         update_orc_and_weights_iter(source_graph, dist_matrix, i, graphname, verbose)
         clock_time(f'Time for ORC {i}')
-        # if i == 2:
-        #     quit()
         
         allstable = True
         if i <2: 
@@ -309,7 +307,7 @@ def one_direction_of_work(source_file, graphname, verbose=False):
             new = clist[-1]
             if old != 0:
                 if absolute_change: error = abs(old-new)
-                else: error = abs((old-new)/old) #relative change
+                else: error = abs((old-new)/old) # relative change
             else: 
                 error = abs(old-new)
                 if (not absolute_change):
@@ -337,9 +335,6 @@ def one_direction_of_work(source_file, graphname, verbose=False):
             write_scorecard('\n\n----- Results -----')
             write_scorecard(f'Source to target distance is {i}')
             break
-        # quit()
-    
-    #TODO: This has no convergence check. Just running it 100 times. Will need to check for convergence
 
     final_dist_matrix = compute_distance_dict(source_graph)
     return final_dist_matrix, source_graph
@@ -428,8 +423,10 @@ def main():
     
     clean_output(False)
     
-    path1 = "inputfiles/ERgraph100nodep4.csv"
-    path2 = "inputfiles/ERgraph100n100changenewrange1000to2000v3.csv"
+    path1 = "inputfiles/jackie/Step2_regulonTargetsInfo_cDC1.csv"
+    path2 = "inputfiles/jackie/Step2_regulonTargetsInfo_cDC2.csv"
+    # path1 = "inputfiles/ERgraph100nodep4.csv"
+    # path2 = "inputfiles/rangechanges/ERgraph100n5changenewrange1000to2000v99.csv"
     
     # Scorecard Writing
     write_scorecard('----- Targeted Ricci Curvature -----')
@@ -444,6 +441,10 @@ def main():
         write_scorecard('Max vs Avg error: Maximum')
     else: 
         write_scorecard('Max vs Avg error: Avg')
+    if approx_emd:
+        write_scorecard('Type of EMD: Approx')
+    else: 
+        write_scorecard('Type of EMD: Exact')
     
     clock_time('Time to read the data in seconds')
 
@@ -457,11 +458,9 @@ def main():
 
     D1 = build_distance_vectors(dist_G1, order_G1)
     D2 = build_distance_vectors(dist_G2, order_G1)
-    #TODO: Persist the ending vectors
+    
     np.savetxt("outputfiles/Graph1FinalDistance.txt", D1, delimiter=" ", fmt="%f")  
     np.savetxt("outputfiles/Graph2FinalDistance.txt", D2, delimiter=" ", fmt="%f")  
-    # print(D1)
-    # print(D2)
     
     write_scorecard('The final distance:')
     write_scorecard(str(np.linalg.norm(D1 - D2)))
@@ -470,27 +469,16 @@ def main():
     for v in range(len(D1)):
         top = np.dot(D1[v], D2[v])
         bot = np.linalg.norm(D1) * np.linalg.norm(D2)
-        # print(top/bot)
         dist = dist + (top/bot)
     write_scorecard(str(dist))
-    # print(np.linalg.norm(D1 - D2))
-
-    # I don't think we need to match them here. Since we have known node correspondence.
-    # mapping = solve_assignment(D1, D2)
-
-    #NOTE: The problem is we need to find a distance. So the mapping section should be moot. 
-    # In theory we're just finding the distance between the 2 vectors (which should be quick to compute w/ numpy or similar.)
-    # print("Alignment between G1 and G2:")
-    # for i, j in mapping:
-    #     print(f"Node {order_G1[i]} in G1 matched to Node {order_G2[j]} in G2")
 
 
 if __name__ == "__main__":
     ITTS = 100
     start = time.time()
     
-    absolute_change = False # False is relative change
+    absolute_change = True # False is relative change
     maximum_error = True # False is average error
-    approx_emd = True
+    approx_emd = False
     
     main()
