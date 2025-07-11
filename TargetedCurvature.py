@@ -208,7 +208,7 @@ class Hypergraph:
         # error handling
         if isinstance(self, UndirectedHypergraph):
             # check data is node A node B
-            node_A, node_B = data
+            node_A, node_B, hyperedge_id = data
             if node_A not in self.nodes or node_B not in self.nodes:
                 print(f"Node {node_A} or {node_B} does not exist in the Undirected hypergraph.")
                 return None  # Return None if either node does not exist
@@ -221,6 +221,33 @@ class Hypergraph:
                 print(f"Edge {hyperedge_id} does not exist in the Directed hypergraph.")
                 return None  # Return None if edge does not exist
             mu_A, mu_B = self.calculate_probability_distributions(hyperedge_id)
+            
+        if approx_emd:
+            weight = self.weights[hyperedge_id][-1] 
+            Na = self.neighbours(node_A)
+            Nb = self.neighbours(node_B)
+            da = len(Na)
+            db = len(Nb)
+            commonNeighbors = Na.intersection(Nb)
+            mins =[]
+            maxs =[]
+            
+            for n in commonNeighbors:
+                # TODO: implement for directed
+                aEdges = self.find_hyperedges_containing_nodes(n,node_A)
+                bEdges = self.find_hyperedges_containing_nodes(n,node_B)
+                for na_id in aEdges:
+                    for nb_id in bEdges:
+                        naw = self.weights[na_id]
+                        nbw = self.weights[nb_id]
+                        mins.append(min(naw/da, nbw/db))
+                        maxs.append(max(naw/da, nbw/db)) 
+            
+            low = - min((1 - (weight/da) - (weight/db) - sum(maxs)), 0) - min((1 - (weight/da) - (weight/db) - sum(mins)), 0) + (sum(mins))
+            high = sum(mins)
+            # print(hyperedge_id, low, high)
+            orc = (low + high)/2
+            return 1-orc
         
         # Convert distributions from dictionary to list format and print for debugging
         nodes_A = sorted(mu_A.keys())
@@ -513,7 +540,7 @@ class UndirectedHypergraph(Hypergraph):
         pair_count = 0
         # Generate all combinations of pairs of nodes
         for node_A, node_B in combinations(nodes, 2):
-            emd = self.earthmover_distance_gurobi_distance_matrix((node_A, node_B), distance_matrix, verbose)
+            emd = self.earthmover_distance_gurobi_distance_matrix((node_A, node_B, hyperedge_id), distance_matrix, verbose)
             
             if emd is not None:
                 sum_emd += emd
@@ -1006,6 +1033,7 @@ if __name__ == "__main__":
 
     directed_flag = False
     verbose = False
+    approx_emd = True
      
     clean_output(verbose)
     
@@ -1019,7 +1047,7 @@ if __name__ == "__main__":
     '''
     start = time.time()
     source_filename = 'petersen/petersengraph.csv'
-    target_filename = 'petersen/petersengraph_bigedges.csv'
+    target_filename = 'petersen/petersengraph_newbigweights.csv'
     # source_filename = 'ERgraph100nodep4.csv'
     # target_filename = 'rangechanges/ERgraph100n5changev3range1000to2000.csv'
     # target_filename = 'ERgraph100nodep4_add10edges.csv'
