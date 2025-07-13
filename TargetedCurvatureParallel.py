@@ -239,7 +239,7 @@ class Hypergraph:
         
         #TODO: check if this works for directed
         if approx_emd:
-            weight = self.weights[hyperedge_id] 
+            weight = self.weights[hyperedge_id][-1]
             Na = self.neighbours(node_A)
             Nb = self.neighbours(node_B)
             da = len(Na)
@@ -1143,12 +1143,12 @@ def manager(npr, verbose = True):
     # starting off things
     clean_output(verbose)
     
-    # source_filename = 'petersen/petersengraph.csv'
-    # target_filename = 'petersen/petersengraph_newbigweights.csv'
+    source_filename = 'petersen/petersengraph.csv'
+    target_filename = 'petersen/petersengraph_newbigweights.csv'
     # source_filename = 'ERgraph500nodep4.csv'
-    source_filename = 'ERgraph100nodep4.csv'
+    # source_filename = 'ERgraph100nodep4.csv'
     # target_filename = 'rangechanges/ERgraph500n5changenewrange1000to2000v3.csv'
-    target_filename = 'rangechanges/ERgraph100n100changenewrange1000to2000v3.csv'
+    # target_filename = 'rangechanges/ERgraph100n100changenewrange1000to2000v3.csv'
 
     data_target = pd.read_csv(f'inputfiles/{target_filename}', dtype ={'source': str, 'target':str}, sep=',')  
     data_source = pd.read_csv(f'inputfiles/{source_filename}', dtype ={'source': str, 'target':str}, sep=',')  
@@ -1243,9 +1243,9 @@ def worker(w, verbose = True):
 if __name__ == "__main__": 
     directed_flag = False
     verbose = False
-    absolute_change = False # False is relative change
-    maximum_error = False # False is average error
-    approx_emd = False
+    absolute_change = True # False is relative change
+    maximum_error = True # False is average error
+    approx_emd = os.environ.get('APPROX')
     
     start = time.time()
     
