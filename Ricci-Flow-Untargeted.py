@@ -423,10 +423,14 @@ def main():
     
     clean_output(False)
     
-    path1 = "inputfiles/jackie/Step2_regulonTargetsInfo_cDC1.csv"
-    path2 = "inputfiles/jackie/Step2_regulonTargetsInfo_cDC2.csv"
+    # path1 = "inputfiles/jackie/Step2_regulonTargetsInfo_cDC1.csv"
+    # path2 = "inputfiles/jackie/Step2_regulonTargetsInfo_cDC2.csv"
     # path1 = "inputfiles/ERgraph100nodep4.csv"
-    # path2 = "inputfiles/rangechanges/ERgraph100n5changenewrange1000to2000v99.csv"
+    # path2 = "inputfiles/rangechanges/ERgraph100n50changenewrange5to10v3.csv"
+    source_filename = os.environ.get('SOURCE_FILENAME')
+    target_filename = os.environ.get('TARGET_FILENAME')
+    path1 = 'inputfiles/' + source_filename
+    path2 = 'inputfiles/' + target_filename
     
     # Scorecard Writing
     write_scorecard('----- Targeted Ricci Curvature -----')
@@ -477,8 +481,8 @@ if __name__ == "__main__":
     ITTS = 100
     start = time.time()
     
-    absolute_change = True # False is relative change
+    absolute_change = False # False is relative change
     maximum_error = True # False is average error
-    approx_emd = False
+    approx_emd = os.environ.get('APPROX')
     
     main()
