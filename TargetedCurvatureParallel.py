@@ -249,8 +249,8 @@ class Hypergraph:
             maxs =[]
             
             for n in commonNeighbors:
-                aEdges = self.find_hyperedges_containing_nodes(n,node_A)
-                bEdges = self.find_hyperedges_containing_nodes(n,node_B)
+                aEdges = self.find_hyperedges_containing_all_nodes(n,node_A)
+                bEdges = self.find_hyperedges_containing_all_nodes(n,node_B)
                 for na_id in aEdges:
                     for nb_id in bEdges:
                         naw = self.weights[na_id]
@@ -440,6 +440,35 @@ class UndirectedHypergraph(Hypergraph):
         if node not in self.nodes:
             raise ValueError("Node does not exist in the graph.")
         return sum(node in hyperedge for hyperedge in self.hyperedges.values())
+    
+    def find_hyperedges_containing_all_nodes(self, *nodes):
+        '''
+        Find hyperedges that contain all of the specified nodes.
+        # Ensure input is treated as a list even if a single node is passed
+        if isinstance(nodes, str):
+            nodes = [nodes]  # Convert single string node to a list
+        '''
+        nodes_set = set(nodes)  # Convert list to set for efficient intersection checks
+
+        # Handle different types of inputs
+        for node in nodes:
+            if isinstance(node, (list, set, tuple)):  # If the input is any kind of collection
+                nodes_set.update(node)  # Add all elements to the set
+            else:
+                nodes_set.add(node)  # Add the single element to the set
+
+        found_hyperedges = []
+        # Ensure all nodes in the set are in our nodes list
+        if not nodes_set.issubset(self.nodes):
+            print("Some nodes are not in the hypergraph.")
+        
+        # Iterate through all hyperedges
+        for hyperedge_id, hyperedge_nodes in self.hyperedges.items():
+            if nodes_set.issubset(nodes_set.intersection(hyperedge_nodes)):  # Check if intersection contains all nodes we want
+                found_hyperedges.append(hyperedge_id)
+        
+        return found_hyperedges
+    
     
     def find_hyperedges_containing_nodes(self, *nodes):
         '''
@@ -1246,6 +1275,8 @@ if __name__ == "__main__":
     absolute_change = True # False is relative change
     maximum_error = True # False is average error
     approx_emd = os.environ.get('APPROX')
+    if approx_emd is None: # Make the default False
+        approx_emd = False
     
     start = time.time()
     
