@@ -1198,7 +1198,6 @@ def manager(npr, verbose = True):
         write_scorecard('Type of EMD: Approx')
     else: 
         write_scorecard('Type of EMD: Exact')
-    
     clock_time('Time to read the data in seconds')
     
     if directed_flag:
@@ -1277,6 +1276,7 @@ if __name__ == "__main__":
     approx_emd = os.environ.get('APPROX')
     if approx_emd is None: # Make the default False
         approx_emd = False
+    approx_emd = eval(approx_emd)
     
     start = time.time()
     
