@@ -515,6 +515,6 @@ if __name__ == "__main__":
     maximum_error = True # False is average error
     approx_emd = os.environ.get('APPROX') 
     if approx_emd is None: # Make the default False
-        approx_emd = True
+        approx_emd = False
     
     main()
