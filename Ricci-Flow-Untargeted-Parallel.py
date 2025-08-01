@@ -6,6 +6,9 @@ from gurobipy import Model, GRB, quicksum, LinExpr,Env
 import time
 import os
 import networkx as nx
+from mpi4py import MPI
+
+COMM = MPI.COMM_WORLD
 
 # now = time.time()
 
@@ -259,11 +262,11 @@ class Hypergraph:
             return None 
 
 
-def update_orc_and_weights_iter(hypergraph:Hypergraph, dist_matrix, iteration, graphname, verbose=False):
+def update_orc_and_weights_iter_manager(npr, hypergraph:Hypergraph, dist_matrix, iteration, graphname, verbose=False):
     file_name = f'outputfiles/dataset_targeted_curvature_{graphname}_iteration_{iteration}.csv'
     # max_dist = max([dist for node_dists in dist_matrix.values() for dist in node_dists.values() if dist < float('inf')])
-    updated_weights = {}
     # NOTE: for right now am going to make this 1
+    updated_weights = {}
     # totweight = hypergraph.get_total_weight() 
     totweight = 1.0
     
@@ -272,47 +275,88 @@ def update_orc_and_weights_iter(hypergraph:Hypergraph, dist_matrix, iteration, g
         if file.tell() == 0:
             writer.writerow(['Hyperedge ID', 'ORC: (based on t-1 weights)', 'Weight:t'])
 
-        for hyperedge_id, nodes in hypergraph.hyperedges.items():
-            if len(nodes) < 2: #hyper edges with less than 2 edges
-                continue
-
-            u, v = nodes[0], nodes[1] # Notably will only work for graphs, not hyper graphs
-            if u not in dist_matrix or v not in dist_matrix[u]:
-                continue
-            
-            orc = 1 - hypergraph.earthmover_distance_gurobi_distance_matrix((u, v, hyperedge_id), dist_matrix) # This is not correct..
-            
-            # Normalize the curvature
-            normalized_orc = ricci_normalizing(orc)
-            # print(f'Edge {hyperedge_id} with ORC {orc}\nNormalized ORC: {normalized_orc}')
-            
-            hypergraph.add_ricci_curvature(hyperedge_id, normalized_orc)
-
-            weight = hypergraph.weights[hyperedge_id] 
-            if iteration != 0:
-                if weight != 0:
-                    step = 1
-                    wtplus1 = weight * (1 - step * normalized_orc) 
-                else:
-                    wtplus1 = weight
-                    
-                # NOTE:The only thing here, is I *think* weights are allowed to be 0
-                updated_weights[hyperedge_id] = max(wtplus1, 1e-8) 
-            else: updated_weights[hyperedge_id] = weight
+        # split the edges. Just do it the simple way. Just have the last one take the rest
+        edges = list(hypergraph.hyperedges.keys())
+        njobs = len(edges)
+        chunksize = njobs//(npr-1)
+        remainder = njobs % (npr-1)
+        jobcnt = 0
+        print('Number of jobs ', njobs)
         
-        for hyperedge_id, new_weight in updated_weights.items():
-            # Will also normalize the weights
-            newtotwt = sum(updated_weights.values())
-            normfactor = totweight/newtotwt
-            # normalized_wt = normfactor * new_weight
-            normalized_wt = new_weight
-            writer.writerow([hyperedge_id, hypergraph.ricci_curvature[hyperedge_id][-1], normalized_wt])
-            # NOTE: Deleting old weights. which probably makes sense. Other than to check convergence maybe
-            hypergraph.weights[hyperedge_id] = normalized_wt
+        while jobcnt < npr-1:
+            # send the jobs
+            for i in range(1, npr):
+                jobcnt = jobcnt + 1 # notably, will basically be equal to i
+                jobstosend = []
+                if jobcnt <= remainder:
+                    jobstosend = edges[(jobcnt-1) * chunksize:jobcnt * chunksize] + [edges[-jobcnt]]
+                else: 
+                    jobstosend = edges[(jobcnt-1) * chunksize: jobcnt * chunksize]
+                SLICE = (jobstosend, dist_matrix, hypergraph, iteration, verbose)
+                COMM.send(SLICE, dest = i, tag=33)
+                if verbose:
+                    print('-> manager sends job', jobcnt, 'to worker', i, 'number of jobs', len(SLICE[0]))
+            # receive the jobs // sync the graphs.
+            for i in range(1, npr):
+                newgraph, updated_weightspt, jobs = COMM.recv(source=i, tag=11)
+                if verbose:
+                    print('-> manager received data from worker', i, 'number of jobs', len(jobs))
+                updated_weights.update(updated_weightspt)
+                for e in jobs: #sync up the graph
+                    hypergraph.add_ricci_curvature(e, newgraph.ricci_curvature[e][-1])
+                    # hypergraph.weights[e] = newgraph.weights[e]
+                    
+            for hyperedge_id, new_weight in updated_weights.items():
+                # Will also normalize the weights
+                newtotwt = sum(updated_weights.values())
+                normfactor = totweight/newtotwt
+                # normalized_wt = normfactor * new_weight
+                normalized_wt = new_weight
+                writer.writerow([hyperedge_id, hypergraph.ricci_curvature[hyperedge_id][-1], normalized_wt])
+                hypergraph.weights[hyperedge_id] = normalized_wt        
+    return
+        
+        
+def update_orc_and_weights_iter_worker():
+    updated_weights = {}
+    specs = COMM.recv(source = 0, tag = 44)
+    if specs == -1: 
+        return False
+    jobs, dist_matrix, graph, iteration, verbose = specs
     
+    for hyperedge_id in jobs:
+        nodes = graph.hyperedges[hyperedge_id]
+        if len(nodes) < 2: #hyper edges with less than 2 edges
+            continue
+
+        u, v = nodes[0], nodes[1] # Notably will only work for graphs, not hyper graphs
+        if u not in dist_matrix or v not in dist_matrix[u]:
+            continue
+        
+        orc = 1 - graph.earthmover_distance_gurobi_distance_matrix((u, v, hyperedge_id), dist_matrix) 
+        
+        # Normalize the curvature
+        normalized_orc = ricci_normalizing(orc)
+        # print(f'Edge {hyperedge_id} with ORC {orc}\nNormalized ORC: {normalized_orc}')
+        
+        graph.add_ricci_curvature(hyperedge_id, normalized_orc)
+
+        weight = graph.weights[hyperedge_id] 
+        if iteration != 0:
+            if weight != 0:
+                step = 1
+                wtplus1 = weight * (1 - step * normalized_orc) 
+            else:
+                wtplus1 = weight
+                
+            # NOTE:The only thing here, is I *think* weights are allowed to be 0
+            updated_weights[hyperedge_id] = max(wtplus1, 1e-8) 
+        else: updated_weights[hyperedge_id] = weight
+    COMM.send((graph, updated_weights, jobs), dest=0, tag=15)
+    return True     
 
 
-def one_direction_of_work(source_file, graphname, verbose=False):
+def one_direction_of_work_manager(npr, source_file, graphname, verbose=False):
     """
     Run Ricci flow a bunch of times and return the final dist matrix and graph
     """
@@ -323,7 +367,7 @@ def one_direction_of_work(source_file, graphname, verbose=False):
 
     for i in range(ITTS):
         dist_matrix = compute_distance_dict(source_graph)
-        update_orc_and_weights_iter(source_graph, dist_matrix, i, graphname, verbose)
+        update_orc_and_weights_iter_manager(npr, source_graph, dist_matrix, i, graphname, verbose)
         clock_time(f'Time for ORC {i}')
         
         allstable = True
@@ -368,6 +412,73 @@ def one_direction_of_work(source_file, graphname, verbose=False):
 
     final_dist_matrix = compute_distance_dict(source_graph)
     return final_dist_matrix, source_graph
+
+
+def one_direction_of_work_worker(tot_its = 100):   
+    update_orc_and_weights_iter_worker() 
+    cont=True
+    cnt = 1
+    while cont and (cnt<=tot_its):
+        cont = update_orc_and_weights_iter_worker()
+        cnt = cnt + 1
+    return 
+
+# def one_direction_of_work(source_file, graphname, verbose=False):
+#     """
+#     Run Ricci flow a bunch of times and return the final dist matrix and graph
+#     """
+#     source_graph = Hypergraph()
+#     build_graph_from_csv(source_file, source_graph)
+    
+#     source_graph.node_index = {node: idx for idx, node in enumerate(list(source_graph.nodes))}
+
+#     for i in range(ITTS):
+#         dist_matrix = compute_distance_dict(source_graph)
+#         update_orc_and_weights_iter(source_graph, dist_matrix, i, graphname, verbose)
+#         clock_time(f'Time for ORC {i}')
+        
+#         allstable = True
+#         if i <2: 
+#             # Take care of the getting started case
+#             continue
+#         errorlist = []
+#         for e in source_graph.hyperedges:
+#             clist = source_graph.ricci_curvature[e]
+#             old = clist[-2]
+#             new = clist[-1]
+#             if old != 0:
+#                 if absolute_change: error = abs(old-new)
+#                 else: error = abs((old-new)/old) # relative change
+#             else: 
+#                 error = abs(old-new)
+#                 if (not absolute_change):
+#                     error = error / old
+#             if maximum_error:
+#                 if absolute_change and (error > 0.01):
+#                     # if verbose:
+#                     clock_time(f'unstable for edge {e} with error {error}')
+#                     allstable = False
+#                     break
+#                 if (not absolute_change) and (error > 0.05): # relative change
+#                     clock_time(f'unstable for edge {e} with error {error}')
+#                     allstable = False
+#                     break
+#             else:
+#                 errorlist.append(error)
+#         if not maximum_error: # AKA we're in average error zone
+#             # assumed to be in absolute error zone
+#             avg_err = np.average(errorlist)
+#             if avg_err > 0.0001:
+#                 clock_time(f'unstable with average error {avg_err}')
+#                 allstable = False
+#         if allstable:
+#             print('STABILIZED! Source to target distance is ',i)
+#             write_scorecard('\n\n----- Results -----')
+#             write_scorecard(f'Source to target distance is {i}')
+#             break
+
+#     final_dist_matrix = compute_distance_dict(source_graph)
+#     return final_dist_matrix, source_graph
 
 
 def build_graph_from_csv(path, hypergraph):
@@ -448,15 +559,14 @@ def ricci_normalizing(R: float)->float:
     ''' 
     return ((1 - np.exp(-1))/(1+ np.exp(-R)))
 
-
-def main():
+def manager(npr, verbose=False):
     
-    clean_output(False)
+    clean_output(verbose)
     
-    path1 = "inputfiles/jackie/com_Step2_regulonTargetsInfo_cDC1.csv"
-    path2 = "inputfiles/jackie/com_Step2_regulonTargetsInfo_cDC2.csv"
-    # path1 = "inputfiles/ERgraph100nodep4.csv"
-    # path2 = "inputfiles/rangechanges/ERgraph100n5changenewrange100to200v3.csv"
+    # path1 = "inputfiles/jackie/com_Step2_regulonTargetsInfo_cDC1.csv"
+    # path2 = "inputfiles/jackie/com_Step2_regulonTargetsInfo_cDC2.csv"
+    path1 = "inputfiles/ERgraph100nodep4.csv"
+    path2 = "inputfiles/rangechanges/ERgraph100n5changenewrange100to200v3.csv"
     # source_filename = os.environ.get('SOURCE_FILENAME')
     # target_filename = os.environ.get('TARGET_FILENAME')
     # path1 = 'inputfiles/' + source_filename
@@ -481,18 +591,17 @@ def main():
         write_scorecard('Type of EMD: Exact')
     
     clock_time('Time to read the data in seconds')
-
-    dist_G1, G1 = one_direction_of_work(path1, "Graph1")
+    
+    dist_G1, G1 = one_direction_of_work_manager(npr, path1, "Graph1")
     write_scorecard('Finished the first graph')
-    dist_G2, G2 = one_direction_of_work(path2, "Graph2")
+    dist_G2, G2 = one_direction_of_work_manager(npr, path2, "Graph2")
     write_scorecard('Finished the second graph')
-
+    
     order_G1 = sorted(G1.nodes) # Might need to think through if there are different nodes? Otherwise, should just be able to use order_G1 for both?
-    # order_G2 = sorted(G2.nodes)
-
+    
     D1 = build_distance_vectors(dist_G1, order_G1)
     D2 = build_distance_vectors(dist_G2, order_G1)
-    
+
     np.savetxt("outputfiles/Graph1FinalDistance.txt", D1, delimiter=" ", fmt="%f")  
     np.savetxt("outputfiles/Graph2FinalDistance.txt", D2, delimiter=" ", fmt="%f")  
     
@@ -505,6 +614,18 @@ def main():
         bot = np.linalg.norm(D1) * np.linalg.norm(D2)
         dist = dist + (top/bot)
     write_scorecard(str(dist))
+    
+
+def worker(w, verbose = True):
+    one_direction_of_work_worker(tot_its = ITTS)
+    one_direction_of_work_worker(tot_its = ITTS)
+    while True:
+        specs = COMM.recv(source = 0, tag = 55)
+        if specs == -33: 
+            if verbose:
+                print(f'Worker {w} goes to sleep')
+            break
+    return   
 
 
 if __name__ == "__main__":
@@ -515,6 +636,12 @@ if __name__ == "__main__":
     maximum_error = True # False is average error
     approx_emd = os.environ.get('APPROX') 
     if approx_emd is None: # Make the default False
-        approx_emd = False
-    
-    main()
+        approx_emd = True
+        
+    RANK = COMM.Get_rank()
+    SIZE = COMM.Get_size()
+    if RANK == 0:
+        manager(SIZE, verbose=False)
+    else: 
+        worker(RANK, verbose=False)
+    print(f'node {RANK} made it to the end')
