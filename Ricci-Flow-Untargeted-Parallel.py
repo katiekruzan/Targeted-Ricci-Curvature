@@ -293,12 +293,12 @@ def update_orc_and_weights_iter_manager(npr, hypergraph:Hypergraph, dist_matrix,
                 else: 
                     jobstosend = edges[(jobcnt-1) * chunksize: jobcnt * chunksize]
                 SLICE = (jobstosend, dist_matrix, hypergraph, iteration, verbose)
-                COMM.send(SLICE, dest = i, tag=33)
+                COMM.send(SLICE, dest = i, tag=333)
                 if verbose:
                     print('-> manager sends job', jobcnt, 'to worker', i, 'number of jobs', len(SLICE[0]))
             # receive the jobs // sync the graphs.
             for i in range(1, npr):
-                newgraph, updated_weightspt, jobs = COMM.recv(source=i, tag=11)
+                newgraph, updated_weightspt, jobs = COMM.recv(source=i, tag=15)
                 if verbose:
                     print('-> manager received data from worker', i, 'number of jobs', len(jobs))
                 updated_weights.update(updated_weightspt)
@@ -317,13 +317,14 @@ def update_orc_and_weights_iter_manager(npr, hypergraph:Hypergraph, dist_matrix,
     return
         
         
-def update_orc_and_weights_iter_worker():
+def update_orc_and_weights_iter_worker(w):
     updated_weights = {}
-    specs = COMM.recv(source = 0, tag = 44)
+    specs = COMM.recv(source = 0, tag = 333)
     if specs == -1: 
         return False
     jobs, dist_matrix, graph, iteration, verbose = specs
-    
+    if verbose:
+        print('worker', w, 'starting job')
     for hyperedge_id in jobs:
         nodes = graph.hyperedges[hyperedge_id]
         if len(nodes) < 2: #hyper edges with less than 2 edges
@@ -352,7 +353,10 @@ def update_orc_and_weights_iter_worker():
             # NOTE:The only thing here, is I *think* weights are allowed to be 0
             updated_weights[hyperedge_id] = max(wtplus1, 1e-8) 
         else: updated_weights[hyperedge_id] = weight
+    if verbose:
+        print('worker', w, 'finished this round')
     COMM.send((graph, updated_weights, jobs), dest=0, tag=15)
+    
     return True     
 
 
@@ -361,11 +365,14 @@ def one_direction_of_work_manager(npr, source_file, graphname, verbose=False):
     Run Ricci flow a bunch of times and return the final dist matrix and graph
     """
     source_graph = Hypergraph()
+    print('building the graph')
     build_graph_from_csv(source_file, source_graph)
     
     source_graph.node_index = {node: idx for idx, node in enumerate(list(source_graph.nodes))}
 
     for i in range(ITTS):
+        if verbose:
+            print('Starting itteration ', i)
         dist_matrix = compute_distance_dict(source_graph)
         update_orc_and_weights_iter_manager(npr, source_graph, dist_matrix, i, graphname, verbose)
         clock_time(f'Time for ORC {i}')
@@ -405,6 +412,9 @@ def one_direction_of_work_manager(npr, source_file, graphname, verbose=False):
                 clock_time(f'unstable with average error {avg_err}')
                 allstable = False
         if allstable:
+            #turn off all workers.
+            for k in range(1,npr):
+                COMM.send(-1, dest = k, tag = 333)
             print('STABILIZED! Source to target distance is ',i)
             write_scorecard('\n\n----- Results -----')
             write_scorecard(f'Source to target distance is {i}')
@@ -414,71 +424,14 @@ def one_direction_of_work_manager(npr, source_file, graphname, verbose=False):
     return final_dist_matrix, source_graph
 
 
-def one_direction_of_work_worker(tot_its = 100):   
-    update_orc_and_weights_iter_worker() 
+def one_direction_of_work_worker(w, tot_its = 100):   
+    update_orc_and_weights_iter_worker(w) 
     cont=True
     cnt = 1
     while cont and (cnt<=tot_its):
-        cont = update_orc_and_weights_iter_worker()
+        cont = update_orc_and_weights_iter_worker(w)
         cnt = cnt + 1
     return 
-
-# def one_direction_of_work(source_file, graphname, verbose=False):
-#     """
-#     Run Ricci flow a bunch of times and return the final dist matrix and graph
-#     """
-#     source_graph = Hypergraph()
-#     build_graph_from_csv(source_file, source_graph)
-    
-#     source_graph.node_index = {node: idx for idx, node in enumerate(list(source_graph.nodes))}
-
-#     for i in range(ITTS):
-#         dist_matrix = compute_distance_dict(source_graph)
-#         update_orc_and_weights_iter(source_graph, dist_matrix, i, graphname, verbose)
-#         clock_time(f'Time for ORC {i}')
-        
-#         allstable = True
-#         if i <2: 
-#             # Take care of the getting started case
-#             continue
-#         errorlist = []
-#         for e in source_graph.hyperedges:
-#             clist = source_graph.ricci_curvature[e]
-#             old = clist[-2]
-#             new = clist[-1]
-#             if old != 0:
-#                 if absolute_change: error = abs(old-new)
-#                 else: error = abs((old-new)/old) # relative change
-#             else: 
-#                 error = abs(old-new)
-#                 if (not absolute_change):
-#                     error = error / old
-#             if maximum_error:
-#                 if absolute_change and (error > 0.01):
-#                     # if verbose:
-#                     clock_time(f'unstable for edge {e} with error {error}')
-#                     allstable = False
-#                     break
-#                 if (not absolute_change) and (error > 0.05): # relative change
-#                     clock_time(f'unstable for edge {e} with error {error}')
-#                     allstable = False
-#                     break
-#             else:
-#                 errorlist.append(error)
-#         if not maximum_error: # AKA we're in average error zone
-#             # assumed to be in absolute error zone
-#             avg_err = np.average(errorlist)
-#             if avg_err > 0.0001:
-#                 clock_time(f'unstable with average error {avg_err}')
-#                 allstable = False
-#         if allstable:
-#             print('STABILIZED! Source to target distance is ',i)
-#             write_scorecard('\n\n----- Results -----')
-#             write_scorecard(f'Source to target distance is {i}')
-#             break
-
-#     final_dist_matrix = compute_distance_dict(source_graph)
-#     return final_dist_matrix, source_graph
 
 
 def build_graph_from_csv(path, hypergraph):
@@ -565,8 +518,8 @@ def manager(npr, verbose=False):
     
     # path1 = "inputfiles/jackie/com_Step2_regulonTargetsInfo_cDC1.csv"
     # path2 = "inputfiles/jackie/com_Step2_regulonTargetsInfo_cDC2.csv"
-    path1 = "inputfiles/ERgraph100nodep4.csv"
-    path2 = "inputfiles/rangechanges/ERgraph100n5changenewrange100to200v3.csv"
+    path1 = "inputfiles/ERgraph500nodep4.csv"
+    path2 = "inputfiles/rangechanges/ERgraph500n5changenewrange100to200v3.csv"
     # source_filename = os.environ.get('SOURCE_FILENAME')
     # target_filename = os.environ.get('TARGET_FILENAME')
     # path1 = 'inputfiles/' + source_filename
@@ -592,9 +545,9 @@ def manager(npr, verbose=False):
     
     clock_time('Time to read the data in seconds')
     
-    dist_G1, G1 = one_direction_of_work_manager(npr, path1, "Graph1")
+    dist_G1, G1 = one_direction_of_work_manager(npr, path1, "Graph1", verbose)
     write_scorecard('Finished the first graph')
-    dist_G2, G2 = one_direction_of_work_manager(npr, path2, "Graph2")
+    dist_G2, G2 = one_direction_of_work_manager(npr, path2, "Graph2", verbose)
     write_scorecard('Finished the second graph')
     
     order_G1 = sorted(G1.nodes) # Might need to think through if there are different nodes? Otherwise, should just be able to use order_G1 for both?
@@ -615,10 +568,18 @@ def manager(npr, verbose=False):
         dist = dist + (top/bot)
     write_scorecard(str(dist))
     
+    # tell the jobs to sleep (at the very end)
+    # send the jobs
+    for i in range(1, npr):
+        SLICE = -33
+        COMM.send(SLICE, dest = i, tag=55)
+        if verbose:
+            print(f'-> manager sends {SLICE} to worker', i)
+    
 
 def worker(w, verbose = True):
-    one_direction_of_work_worker(tot_its = ITTS)
-    one_direction_of_work_worker(tot_its = ITTS)
+    one_direction_of_work_worker(w, tot_its = ITTS)
+    one_direction_of_work_worker(w, tot_its = ITTS)
     while True:
         specs = COMM.recv(source = 0, tag = 55)
         if specs == -33: 
@@ -641,7 +602,7 @@ if __name__ == "__main__":
     RANK = COMM.Get_rank()
     SIZE = COMM.Get_size()
     if RANK == 0:
-        manager(SIZE, verbose=False)
+        manager(SIZE, verbose=True)
     else: 
-        worker(RANK, verbose=False)
+        worker(RANK, verbose=True)
     print(f'node {RANK} made it to the end')
