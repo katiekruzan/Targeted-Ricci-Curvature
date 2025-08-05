@@ -253,8 +253,8 @@ class Hypergraph:
                 bEdges = self.find_hyperedges_containing_all_nodes(n,node_B)
                 for na_id in aEdges:
                     for nb_id in bEdges:
-                        naw = self.weights[na_id]
-                        nbw = self.weights[nb_id]
+                        naw = self.weights[na_id][-1]
+                        nbw = self.weights[nb_id][-1]
                         mins.append(min(naw/da, nbw/db))
                         maxs.append(max(naw/da, nbw/db)) 
             
