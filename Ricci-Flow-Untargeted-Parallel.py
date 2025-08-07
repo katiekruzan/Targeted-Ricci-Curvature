@@ -593,7 +593,7 @@ if __name__ == "__main__":
     ITTS = 100
     start = time.time()
     
-    absolute_change = False # False is relative change
+    absolute_change = True # False is relative change
     maximum_error = True # False is average error
     approx_emd = os.environ.get('APPROX') 
     if approx_emd is None: # Make the default False
