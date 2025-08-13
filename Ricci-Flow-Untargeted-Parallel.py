@@ -526,7 +526,7 @@ def manager(npr, verbose=False):
     path2 = 'inputfiles/' + target_filename
     
     # Scorecard Writing
-    write_scorecard('----- Targeted Ricci Curvature -----')
+    write_scorecard('----- Untargeted Ricci Curvature -----')
     write_scorecard(f'Graph 1 filename: {path1}')
     write_scorecard(f'Graph 2 filename: {path2}')
     
