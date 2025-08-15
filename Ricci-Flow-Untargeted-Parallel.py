@@ -603,7 +603,7 @@ if __name__ == "__main__":
     RANK = COMM.Get_rank()
     SIZE = COMM.Get_size()
     if RANK == 0:
-        manager(SIZE, verbose=True)
+        manager(SIZE, verbose=False)
     else: 
-        worker(RANK, verbose=True)
+        worker(RANK, verbose=False)
     print(f'node {RANK} made it to the end')
