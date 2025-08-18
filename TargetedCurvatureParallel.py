@@ -228,12 +228,17 @@ class Hypergraph:
         # pprint(dist)
         # Floyd-Warshall algorithm to update distances
         for k in self.nodes:
-            # print('check in at node', k)
+            print('check in at node', k)
             # pprint(dist)
             for i in self.nodes:
                 for j in self.nodes:
                     if dist[node_index[i]][node_index[k]] + dist[node_index[k]][node_index[j]] < dist[node_index[i]][node_index[j]]:
                         dist[node_index[i]][node_index[j]] = dist[node_index[i]][node_index[k]] + dist[node_index[k]][node_index[j]]
+        # replacing inf with max + 1
+        tmp = np.array(dist)
+        tmp[tmp == float('inf')] = -1
+        tmp[tmp==-1] = np.max(tmp) + 1
+        dist = tmp.tolist()
         # pprint(dist)
         return dist
      
@@ -1252,7 +1257,7 @@ def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100, op_
     
 
 def one_direction_of_work_worker(tot_its = 100):   
-    # quit()
+    quit()
     calculate_target_orc_worker()
     # quit()
     update_orc_and_weights_iter_worker() 
