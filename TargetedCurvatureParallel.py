@@ -19,6 +19,7 @@ import time
 import os
 from numbers import Number
 from mpi4py import MPI
+from pprint import pprint
 
 COMM = MPI.COMM_WORLD
 
@@ -120,6 +121,39 @@ class Hypergraph:
         dfs(start_node)
         return visited == self.nodes   
     
+    def is_strongly_connected(self)-> bool:
+        '''Check if the underlying graph is strongly connected
+
+        :return bool: True if weakly connected
+        '''        
+        # I think this is saying an empty graph is weakly connected
+        if not self.nodes: 
+            return True
+
+        edges = self.hyperedges
+        
+        visited = set()
+
+        def dfs(node):
+            '''Depth First Search'''
+            if node in visited:
+                return visited
+            visited.add(node)
+            for edge in edges.values():
+                if node in edge:
+                    for next_node in edge:
+                        if next_node != node:
+                            dfs(next_node)
+
+        # Do DFS from each node
+        for v in iter(self.nodes):
+            dfs(v)
+            if visited != self.nodes:
+                return False
+            else: 
+                visited = set()
+        return True 
+    
     def floyd_warshall(self) -> list[list]:
         '''Use the Floyd-Warshall algorithm to find the shortest distances between
            each pair of vertices. Right now, if you cannot get from one node to 
@@ -144,6 +178,8 @@ class Hypergraph:
         # Set the diagonal to 0 (distance from each node to itself) 
         for i in range(node_count):
             dist[i][i] = 0
+            
+        pprint(dist)
         
         # Set the distance for directly connected nodes based on edge weights
         for hyperedge_id, nodes in self.hyperedges.items():
@@ -170,14 +206,17 @@ class Hypergraph:
                     # Update the distance with the weight of the edge
                     dist[node_index[tail]][node_index[head]] = min(dist[node_index[tail]][node_index[head]],
                                                                    self.weights[hyperedge_id][-1])  # Using the last weight in the list
-        
+        print('adding weights')
+        pprint(dist)
         # Floyd-Warshall algorithm to update distances
         for k in self.nodes:
+            print('check in at node', k)
+            pprint(dist)
             for i in self.nodes:
                 for j in self.nodes:
                     if dist[node_index[i]][node_index[k]] + dist[node_index[k]][node_index[j]] < dist[node_index[i]][node_index[j]]:
                         dist[node_index[i]][node_index[j]] = dist[node_index[i]][node_index[k]] + dist[node_index[k]][node_index[j]]
-
+        pprint(dist)
         return dist
      
     def calculate_degrees(self):
@@ -291,11 +330,17 @@ class Hypergraph:
         
         # Create a mapping of nodes to their indices in the distance matrix.
         node_to_index = self.node_index
+
         if RND1:
             clock_time('starting one job')
+        
+        # print('setting up')
         env = Env(empty=True)
+        # print('eh')
         env.setParam("OutputFlag",0)
+        # print('bleh')
         env.start()
+        # print('check in')
         
         try:
             # Create a new model in Gurobi.
@@ -310,7 +355,7 @@ class Hypergraph:
             
             # Create variables for the linear program.
             variables = model.addVars(mu_A.keys(), mu_B.keys(), name="z", lb=0) 
-            
+            # print('boom')
             expr = LinExpr(3.0)
             expr.clear()
             for x in mu_A:
@@ -326,12 +371,14 @@ class Hypergraph:
 
             for y in mu_B:
                 model.addConstr(quicksum(variables[x, y] for x in mu_A) == mu_B[y], f"dirt_filling_{y}")
-            
+            # print('bang')
             # Start the timer, solve the model, and calculate the time taken.
             model.optimize()
             if RND1:
                 clock_time('finished the model')
                 RND1 = False
+            # print('done with the model')
+            
             # Check the model status and process the results.
             if model.status == GRB.OPTIMAL:
                 total_cost = model.getObjective().getValue()
@@ -882,6 +929,7 @@ def update_orc_and_weights_iter_manager(npr, distance_matrix:list[list], graph:H
                     for e in jobs: #sync up the graph
                         graph.add_ricci_curvature(e, newgraph.ricci_curvature[e][-1])
                         graph.add_weights(e, newgraph.weights[e][-1])
+                        writer.writerow([e, newgraph.ricci_curvature[e][-1], newgraph.weights[e][-1]]) 
                     # clock_time(f'gathered data from processor: {i}')
     return
             
@@ -893,33 +941,32 @@ def update_orc_and_weights_iter_worker():
         return False
     jobs, distance_matrix, graph, targ_graph, file_name, verbose, itteration = specs
     RND1 = True
-    with open(file_name, 'a', newline='') as file:
-        writer = csv.writer(file)
-        for hyperedge_id in jobs:
-            if isinstance(graph, UndirectedHypergraph):
-                orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose)
-            elif isinstance(graph, DirectedHypergraph): 
-                orc = 1 - graph.earthmover_distance_gurobi_distance_matrix(hyperedge_id, distance_matrix, verbose)
-            clock_time('finished the orc')
-            normalized_orc = ricci_normalizing(orc)
-            clock_time('Normalized the orc')
-            graph.add_ricci_curvature(hyperedge_id, normalized_orc)
-            weight = graph.weights[hyperedge_id][-1]
-            if itteration != 0:
-                orc_targ = targ_graph.ricci_curvature[hyperedge_id][-1]
-                if weight != 0:
-                    #simple version
-                    step = 1
-                    wtplus1 = weight*(1  - step*(normalized_orc - orc_targ))
-                    normalized_weight = wtplus1
-                else:
-                    normalized_weight = 0
-                
-                graph.add_weights(hyperedge_id, normalized_weight)
+
+    # with open(file_name, 'a', newline='') as file:
+        # writer = csv.writer(file)
+    for hyperedge_id in jobs:
+        if isinstance(graph, UndirectedHypergraph):
+            orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose)
+        elif isinstance(graph, DirectedHypergraph): 
+            orc = 1 - graph.earthmover_distance_gurobi_distance_matrix(hyperedge_id, distance_matrix, verbose)
+        normalized_orc = ricci_normalizing(orc)
+        graph.add_ricci_curvature(hyperedge_id, normalized_orc)
+        weight = graph.weights[hyperedge_id][-1]
+        if itteration != 0:
+            orc_targ = targ_graph.ricci_curvature[hyperedge_id][-1]
+            if weight != 0:
+                #simple version
+                step = 1
+                wtplus1 = weight*(1  - step*(normalized_orc - orc_targ))
+                normalized_weight = wtplus1
+            else:
+                normalized_weight = 0
             
-                writer.writerow([hyperedge_id, normalized_orc, normalized_weight])
-            else: 
-                writer.writerow([hyperedge_id, normalized_orc, weight])
+            graph.add_weights(hyperedge_id, normalized_weight)
+            
+                # writer.writerow([hyperedge_id, normalized_orc, normalized_weight])
+            # else: 
+                # writer.writerow([hyperedge_id, normalized_orc, weight])
     COMM.send((graph,jobs) , dest=0, tag=11)
     return True
 
@@ -970,12 +1017,13 @@ def calculate_target_orc_manager(npr, distance_matrix: list[list], graph:Hypergr
             # receive the jobs // sync the graphs.
             for i in range(1, npr):
                 newgraph, jobs = COMM.recv(source=i, tag=11)
+                clock_time(f'gathered data from processor: {i}')
                 if True:
                     print('-> manager received data from worker', i, 'number of jobs', len(jobs))
                 for e in jobs: #sync up the graph
                     graph.add_ricci_curvature(e, newgraph.ricci_curvature[e][-1])
                     graph.add_weights(e, newgraph.weights[e][-1])
-                clock_time(f'gathered data from processor: {i}')
+                    writer.writerow([e, newgraph.ricci_curvature[e][-1], newgraph.weights[e][-1]]) 
     return
 
 
@@ -986,17 +1034,18 @@ def calculate_target_orc_worker():
         return
     jobs, distance_matrix, graph, file_name, verbose = specs
     RND1 = True
-    with open(file_name, 'a', newline='') as file:
-        writer = csv.writer(file)
-        for hyperedge_id in jobs:
-            if isinstance(graph, UndirectedHypergraph):
-                orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose)
-            elif isinstance(graph, DirectedHypergraph): 
-                orc = 1 - graph.earthmover_distance_gurobi_distance_matrix(hyperedge_id, distance_matrix, verbose)
-            normalized_orc = ricci_normalizing(orc)
-            graph.add_ricci_curvature(hyperedge_id, normalized_orc)
-            weight = graph.weights[hyperedge_id][-1]
-            writer.writerow([hyperedge_id, normalized_orc, weight])  
+
+    # with open(file_name, 'a', newline='') as file:
+        # writer = csv.writer(file)
+    for hyperedge_id in jobs:
+        if isinstance(graph, UndirectedHypergraph):
+            orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose)
+        elif isinstance(graph, DirectedHypergraph): 
+            orc = 1 - graph.earthmover_distance_gurobi_distance_matrix(hyperedge_id, distance_matrix, verbose)
+        normalized_orc = ricci_normalizing(orc)
+        graph.add_ricci_curvature(hyperedge_id, normalized_orc)
+        # weight = graph.weights[hyperedge_id][-1]
+            # writer.writerow([hyperedge_id, normalized_orc, weight])  
     COMM.send((graph,jobs) , dest=0, tag=11)
     return
 
@@ -1008,6 +1057,8 @@ def early_analysis(src_graph:Hypergraph, verbose:bool):
     :param bool verbose: verbose flag
     '''
     connected = src_graph.is_weakly_connected()
+    if isinstance(src_graph, DirectedHypergraph):
+        strconnect = src_graph.is_strongly_connected()
     max_degree, min_degree, avg_degree = src_graph.calculate_degrees()
 
     if verbose:
@@ -1030,6 +1081,9 @@ def early_analysis(src_graph:Hypergraph, verbose:bool):
     write_scorecard(f'Number of nodes: {len(src_graph.nodes)}')
     if connected: write_scorecard('The hypergraph is weakly connected.')
     else: write_scorecard('The hypergraph is not weakly connected.')
+    if isinstance(src_graph, DirectedHypergraph):
+        if strconnect: write_scorecard('The hypergraph is strongly connected.')
+        else: write_scorecard('The hypergraph is not strongly connected.')
     write_scorecard(f"Max Degree: {max_degree}")
     write_scorecard(f"Min Degree: {min_degree}")
     write_scorecard(f"Average Degree: {avg_degree}")
@@ -1049,6 +1103,7 @@ def set_up_one_direction(src_graph:Hypergraph, targ_graph:Hypergraph, op_flag=Fa
     if op_flag: matfilename += 'op_'
     matfilename += 'undirected_source_dist_fw.csv'
     save_matrix_csv(distance_matrix, matfilename)
+    quit()
     
     clock_time('Time to make the source distance matrix')
 
@@ -1188,10 +1243,12 @@ def manager(npr, verbose = True):
     # starting off things
     clean_output(verbose)
     
-    source_filename = os.environ.get('SOURCE_FILENAME')
-    target_filename = os.environ.get('TARGET_FILENAME')
+    # source_filename = os.environ.get('SOURCE_FILENAME')
+    # target_filename = os.environ.get('TARGET_FILENAME')
     # source_filename = 'ERgraph500nodep4.csv'
     # source_filename = 'ERgraph100nodep4.csv'
+    source_filename = 'petersen/petersengraph.csv'
+    target_filename = 'petersen/petersengraph_newbigweights.csv'
     # target_filename = 'rangechanges/ERgraph500n5changenewrange1000to2000v3.csv'
     # target_filename = 'rangechanges/ERgraph100n100changenewrange1000to2000v3.csv'
 
@@ -1285,13 +1342,13 @@ def worker(w, verbose = True):
     return    
   
 if __name__ == "__main__": 
-    directed_flag = False
+    directed_flag = True
     verbose = False
     absolute_change = True # False is relative change
     maximum_error = True # False is average error
     approx_emd = os.environ.get('APPROX')
     if approx_emd is None: # Make the default False
-        approx_emd = False
+        approx_emd = 'False'
     approx_emd = eval(approx_emd)
     
     start = time.time()
