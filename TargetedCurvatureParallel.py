@@ -137,18 +137,35 @@ class Hypergraph:
         def dfs(node):
             '''Depth First Search'''
             if node in visited:
+                # print('got here')
                 return visited
             visited.add(node)
             for edge in edges.values():
-                if node in edge:
-                    for next_node in edge:
-                        if next_node != node:
-                            dfs(next_node)
+                # print(edge)
+                if isinstance(self, UndirectedHypergraph):
+                    if node in edge:
+                        for next_node in edge:
+                            # print(next_node)
+                            if next_node != node:
+                                dfs(next_node)
+                elif isinstance(self, DirectedHypergraph):
+                    # note tail and head
+                    tail, head = edge
+                    if node in tail:
+                        for next_node in head:
+                            # print(next_node)
+                            if next_node != node:
+                                dfs(next_node)
 
         # Do DFS from each node
         for v in iter(self.nodes):
+            visited = set()
+            # print('hellloooo')
             dfs(v)
+            # write_scorecard(str(visited))
             if visited != self.nodes:
+                # write_scorecard(f'not strongly connected based on vertex {v}')
+                # write_scorecard(str(visited))
                 return False
             else: 
                 visited = set()
@@ -171,6 +188,7 @@ class Hypergraph:
         # Create a mapping of node to index
         self.update_node_index()
         node_index = self.node_index
+        # print(node_index)
 
         # Initialize a 2D list (matrix) with "infinite" distances
         dist = [[float('inf') for _ in range(node_count)] for _ in range(node_count)]
@@ -179,7 +197,7 @@ class Hypergraph:
         for i in range(node_count):
             dist[i][i] = 0
             
-        pprint(dist)
+        # pprint(dist)
         
         # Set the distance for directly connected nodes based on edge weights
         for hyperedge_id, nodes in self.hyperedges.items():
@@ -207,16 +225,16 @@ class Hypergraph:
                     dist[node_index[tail]][node_index[head]] = min(dist[node_index[tail]][node_index[head]],
                                                                    self.weights[hyperedge_id][-1])  # Using the last weight in the list
         print('adding weights')
-        pprint(dist)
+        # pprint(dist)
         # Floyd-Warshall algorithm to update distances
         for k in self.nodes:
-            print('check in at node', k)
-            pprint(dist)
+            # print('check in at node', k)
+            # pprint(dist)
             for i in self.nodes:
                 for j in self.nodes:
                     if dist[node_index[i]][node_index[k]] + dist[node_index[k]][node_index[j]] < dist[node_index[i]][node_index[j]]:
                         dist[node_index[i]][node_index[j]] = dist[node_index[i]][node_index[k]] + dist[node_index[k]][node_index[j]]
-        pprint(dist)
+        # pprint(dist)
         return dist
      
     def calculate_degrees(self):
@@ -1042,10 +1060,13 @@ def calculate_target_orc_worker():
             orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose)
         elif isinstance(graph, DirectedHypergraph): 
             orc = 1 - graph.earthmover_distance_gurobi_distance_matrix(hyperedge_id, distance_matrix, verbose)
+        if RND1:
+            clock_time('finished ORC')
         normalized_orc = ricci_normalizing(orc)
         graph.add_ricci_curvature(hyperedge_id, normalized_orc)
         # weight = graph.weights[hyperedge_id][-1]
             # writer.writerow([hyperedge_id, normalized_orc, weight])  
+    clock_time('finished worker now sending over')
     COMM.send((graph,jobs) , dest=0, tag=11)
     return
 
@@ -1060,6 +1081,7 @@ def early_analysis(src_graph:Hypergraph, verbose:bool):
     if isinstance(src_graph, DirectedHypergraph):
         strconnect = src_graph.is_strongly_connected()
     max_degree, min_degree, avg_degree = src_graph.calculate_degrees()
+    # quit()
 
     if verbose:
         print('type of graph', type(src_graph))
@@ -1151,6 +1173,7 @@ def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100, op_
     calculate_target_orc_manager(npr, targ_distance_matrix, targ_graph, verbose, op_flag=op_flag)
 
     clock_time('Time to calc target ORC')
+    # quit()
 
     update_orc_and_weights_iter_manager(npr, distance_matrix, src_graph, targ_graph, iteration=0, verbose=verbose, op_flag=op_flag)
 
@@ -1229,7 +1252,9 @@ def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100, op_
     
 
 def one_direction_of_work_worker(tot_its = 100):   
+    # quit()
     calculate_target_orc_worker()
+    # quit()
     update_orc_and_weights_iter_worker() 
     cont=True
     cnt = 1
@@ -1243,12 +1268,12 @@ def manager(npr, verbose = True):
     # starting off things
     clean_output(verbose)
     
-    # source_filename = os.environ.get('SOURCE_FILENAME')
-    # target_filename = os.environ.get('TARGET_FILENAME')
+    source_filename = os.environ.get('SOURCE_FILENAME')
+    target_filename = os.environ.get('TARGET_FILENAME')
     # source_filename = 'ERgraph500nodep4.csv'
     # source_filename = 'ERgraph100nodep4.csv'
-    source_filename = 'petersen/petersengraph.csv'
-    target_filename = 'petersen/petersengraph_newbigweights.csv'
+    # source_filename = 'petersen/petersengraph.csv'
+    # target_filename = 'petersen/petersengraph_newbigweights.csv'
     # target_filename = 'rangechanges/ERgraph500n5changenewrange1000to2000v3.csv'
     # target_filename = 'rangechanges/ERgraph100n100changenewrange1000to2000v3.csv'
 
