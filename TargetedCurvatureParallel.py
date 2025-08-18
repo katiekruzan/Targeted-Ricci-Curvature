@@ -24,6 +24,8 @@ COMM = MPI.COMM_WORLD
 
 now = time.time()
 
+RND1 = True
+
 class Hypergraph:
     def __init__(self):       
         '''Initializing the hypergraph
@@ -220,6 +222,7 @@ class Hypergraph:
         :raises ValueError: _description_
         :return _type_: _description_
         '''
+        global RND1
         # error handling
         if isinstance(self, UndirectedHypergraph):
             # check data is node A node B
@@ -288,7 +291,8 @@ class Hypergraph:
         
         # Create a mapping of nodes to their indices in the distance matrix.
         node_to_index = self.node_index
-        
+        if RND1:
+            clock_time('starting one job')
         env = Env(empty=True)
         env.setParam("OutputFlag",0)
         env.start()
@@ -325,7 +329,9 @@ class Hypergraph:
             
             # Start the timer, solve the model, and calculate the time taken.
             model.optimize()
-            
+            if RND1:
+                clock_time('finished the model')
+                RND1 = False
             # Check the model status and process the results.
             if model.status == GRB.OPTIMAL:
                 total_cost = model.getObjective().getValue()
@@ -881,10 +887,12 @@ def update_orc_and_weights_iter_manager(npr, distance_matrix:list[list], graph:H
             
                     
 def update_orc_and_weights_iter_worker():
+    global RND1
     specs = COMM.recv(source = 0, tag = 44)
     if specs == -1: 
         return False
     jobs, distance_matrix, graph, targ_graph, file_name, verbose, itteration = specs
+    RND1 = True
     with open(file_name, 'a', newline='') as file:
         writer = csv.writer(file)
         for hyperedge_id in jobs:
@@ -892,7 +900,9 @@ def update_orc_and_weights_iter_worker():
                 orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose)
             elif isinstance(graph, DirectedHypergraph): 
                 orc = 1 - graph.earthmover_distance_gurobi_distance_matrix(hyperedge_id, distance_matrix, verbose)
+            clock_time('finished the orc')
             normalized_orc = ricci_normalizing(orc)
+            clock_time('Normalized the orc')
             graph.add_ricci_curvature(hyperedge_id, normalized_orc)
             weight = graph.weights[hyperedge_id][-1]
             if itteration != 0:
@@ -954,8 +964,9 @@ def calculate_target_orc_manager(npr, distance_matrix: list[list], graph:Hypergr
                     jobstosend = edges[(jobcnt-1) * chunksize: jobcnt * chunksize]
                 SLICE = (jobstosend, distance_matrix, graph, file_name, verbose)
                 COMM.send(SLICE, dest = i, tag=33)
-                if True:
+                if verbose:
                     print('-> manager sends job', jobcnt, 'to worker', i, 'number of jobs', len(SLICE[0]))
+            clock_time('manager sent all the jobs')
             # receive the jobs // sync the graphs.
             for i in range(1, npr):
                 newgraph, jobs = COMM.recv(source=i, tag=11)
@@ -964,15 +975,17 @@ def calculate_target_orc_manager(npr, distance_matrix: list[list], graph:Hypergr
                 for e in jobs: #sync up the graph
                     graph.add_ricci_curvature(e, newgraph.ricci_curvature[e][-1])
                     graph.add_weights(e, newgraph.weights[e][-1])
-                # clock_time(f'gathered data from processor: {i}')
+                clock_time(f'gathered data from processor: {i}')
     return
 
 
 def calculate_target_orc_worker():
+    global RND1
     specs = COMM.recv(source = 0, tag = 33)
     if specs == -1: 
         return
     jobs, distance_matrix, graph, file_name, verbose = specs
+    RND1 = True
     with open(file_name, 'a', newline='') as file:
         writer = csv.writer(file)
         for hyperedge_id in jobs:
@@ -1059,11 +1072,13 @@ def set_up_one_direction(src_graph:Hypergraph, targ_graph:Hypergraph, op_flag=Fa
         # add edges that are in the target but not the source
         src_graph.add_missing_edges_shortest_path(targ_graph, distance_matrix, verbose)
         targ_graph.add_missing_edges_shortest_path(src_graph, target_distance_matrix, verbose)
+        clock_time('time to add missing edges')
         
         # recalculate the matrices
         distance_matrix = src_graph.floyd_warshall()
         
         target_distance_matrix = targ_graph.floyd_warshall()
+        clock_time('time to recalc the distances')
     
     print('len mising from source', len(missing_from_src))
     print('len mising from targ', len(missing_from_targ))
@@ -1075,6 +1090,7 @@ def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100, op_
     # One Direction of Work
     targ_distance_matrix, distance_matrix, missing_from_src, missing_from_targ = set_up_one_direction(src_graph, targ_graph, op_flag)
     
+    clock_time('time to set up')
     print('starting ricci curvature')
     # Now I have to parallelize this buddy
     calculate_target_orc_manager(npr, targ_distance_matrix, targ_graph, verbose, op_flag=op_flag)
