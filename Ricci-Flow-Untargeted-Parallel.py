@@ -547,15 +547,15 @@ def manager(npr, verbose=False):
     
     dist_G1, G1 = one_direction_of_work_manager(npr, path1, "Graph1", verbose)
     write_scorecard('Finished the first graph')
+    
+    order_G1 = sorted(G1.nodes) # Might need to think through if there are different nodes? Otherwise, should just be able to use order_G1 for both?
+    D1 = build_distance_vectors(dist_G1, order_G1)
+    np.savetxt("outputfiles/Graph1FinalDistance.txt", D1, delimiter=" ", fmt="%f") 
+
     dist_G2, G2 = one_direction_of_work_manager(npr, path2, "Graph2", verbose)
     write_scorecard('Finished the second graph')
     
-    order_G1 = sorted(G1.nodes) # Might need to think through if there are different nodes? Otherwise, should just be able to use order_G1 for both?
-    
-    D1 = build_distance_vectors(dist_G1, order_G1)
     D2 = build_distance_vectors(dist_G2, order_G1)
-
-    np.savetxt("outputfiles/Graph1FinalDistance.txt", D1, delimiter=" ", fmt="%f")  
     np.savetxt("outputfiles/Graph2FinalDistance.txt", D2, delimiter=" ", fmt="%f")  
     
     write_scorecard('The final distance:')
