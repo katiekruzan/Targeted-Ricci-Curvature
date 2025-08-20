@@ -174,7 +174,7 @@ class Hypergraph:
     def floyd_warshall(self) -> list[list]:
         '''Use the Floyd-Warshall algorithm to find the shortest distances between
            each pair of vertices. Right now, if you cannot get from one node to 
-           another, the distance will be 'inf'. This will be relevant in the 
+           another, the distance will be the maximum value + 1. This will be relevant in the 
            case of directed, not strongly connected graphs.
 
         :return list[list]: a matrix with the shortest distances
@@ -184,6 +184,7 @@ class Hypergraph:
         # Assume self.nodes is a list or set of nodes
         node_list = list(self.nodes) # Convert to list to ensure consistent ordering
         node_count = len(node_list)
+        # print(node_count)
         
         # Create a mapping of node to index
         self.update_node_index()
@@ -224,16 +225,17 @@ class Hypergraph:
                     # Update the distance with the weight of the edge
                     dist[node_index[tail]][node_index[head]] = min(dist[node_index[tail]][node_index[head]],
                                                                    self.weights[hyperedge_id][-1])  # Using the last weight in the list
-        print('adding weights')
+        # print('adding weights')
         # pprint(dist)
         # Floyd-Warshall algorithm to update distances
         for k in self.nodes:
-            print('check in at node', k)
+            # print('check in at node', k)
             # pprint(dist)
             for i in self.nodes:
                 for j in self.nodes:
                     if dist[node_index[i]][node_index[k]] + dist[node_index[k]][node_index[j]] < dist[node_index[i]][node_index[j]]:
                         dist[node_index[i]][node_index[j]] = dist[node_index[i]][node_index[k]] + dist[node_index[k]][node_index[j]]
+        
         # replacing inf with max + 1
         tmp = np.array(dist)
         tmp[tmp == float('inf')] = -1
@@ -662,7 +664,7 @@ class UndirectedHypergraph(Hypergraph):
         pair_count = 0
         # Generate all combinations of pairs of nodes
         for node_A, node_B in combinations(nodes, 2):
-            emd = self.earthmover_distance_gurobi_distance_matrix((node_A, node_B, hyperedge_id), distance_matrix, verbose)
+            emd = self.earthmover_distance_gurobi_distance_matrix((node_A, node_B, hyperedge_id), distance_matrix, verbose=False)
             
             if emd is not None:
                 sum_emd += emd
@@ -728,12 +730,13 @@ class DirectedHypergraph(Hypergraph):
         :param bool verbose: verbose flag, defaults to True
         '''
         # make an edge from each row in the csv
+        # TODO: make actually work for hypergraphs
         for _, row in df.iterrows():
             node1 = row['source'].strip() #start
             node2 = row['target'].strip() #end
             weight = float(row['weight'])
             edgeid = node1 + '_to_' + node2
-            self.add_hyperedge(edgeid, set(node1), set(node2), [weight])
+            self.add_hyperedge(edgeid, set([node1]), set([node2]), [weight])
             if verbose:
                 print(f'Added hyperedge {edgeid} with head set {node1} and tail set {node2}')
         return
@@ -971,7 +974,7 @@ def update_orc_and_weights_iter_worker():
         if isinstance(graph, UndirectedHypergraph):
             orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose)
         elif isinstance(graph, DirectedHypergraph): 
-            orc = 1 - graph.earthmover_distance_gurobi_distance_matrix(hyperedge_id, distance_matrix, verbose)
+            orc = 1 - graph.earthmover_distance_gurobi_distance_matrix(hyperedge_id, distance_matrix, verbose=False)
         normalized_orc = ricci_normalizing(orc)
         graph.add_ricci_curvature(hyperedge_id, normalized_orc)
         weight = graph.weights[hyperedge_id][-1]
@@ -1064,7 +1067,7 @@ def calculate_target_orc_worker():
         if isinstance(graph, UndirectedHypergraph):
             orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose)
         elif isinstance(graph, DirectedHypergraph): 
-            orc = 1 - graph.earthmover_distance_gurobi_distance_matrix(hyperedge_id, distance_matrix, verbose)
+            orc = 1 - graph.earthmover_distance_gurobi_distance_matrix(hyperedge_id, distance_matrix, verbose=False)
         if RND1:
             clock_time('finished ORC')
         normalized_orc = ricci_normalizing(orc)
@@ -1128,7 +1131,7 @@ def set_up_one_direction(src_graph:Hypergraph, targ_graph:Hypergraph, op_flag=Fa
     distance_matrix = src_graph.floyd_warshall()
     matfilename = 'outputfiles/'
     if op_flag: matfilename += 'op_'
-    matfilename += 'undirected_source_dist_fw.csv'
+    matfilename += 'source_dist_fw.csv'
     save_matrix_csv(distance_matrix, matfilename)
     quit()
     
@@ -1137,7 +1140,7 @@ def set_up_one_direction(src_graph:Hypergraph, targ_graph:Hypergraph, op_flag=Fa
     target_distance_matrix = targ_graph.floyd_warshall()
     matfilename = 'outputfiles/'
     if op_flag: matfilename += 'op_'
-    matfilename += 'undirected_target_dist_fw.csv'
+    matfilename += 'target_dist_fw.csv'
     save_matrix_csv(target_distance_matrix, matfilename)
     
     clock_time('Time to make the target distance matrix')
@@ -1312,6 +1315,7 @@ def manager(npr, verbose = True):
         
     print('building source')          
     source_graph.build_from_dataframe(data_source, verbose)
+    # print(source_graph.nodes)
     print('building target')
     target_graph.build_from_dataframe(data_target, verbose)
     
@@ -1373,7 +1377,7 @@ def worker(w, verbose = True):
   
 if __name__ == "__main__": 
     directed_flag = True
-    verbose = False
+    verbose = True
     absolute_change = True # False is relative change
     maximum_error = True # False is average error
     approx_emd = os.environ.get('APPROX')
