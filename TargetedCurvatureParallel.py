@@ -690,7 +690,7 @@ class UndirectedHypergraph(Hypergraph):
     
   
 class DirectedHypergraph(Hypergraph):
-    #TODO: Doesn't work for non Strongly Connected right now. fix later.
+    #TODO: Doesn't work for non Strongly Connected right now. fix later. - Fixed via adding themax+1 to the dist matrix in theory.
     def add_hyperedge(self, hyperedge_id:str, tail_set:set, head_set:set, weight_list = [1], verbose=True) -> None:
         '''Function to add a hyperedge to the hypergraph, if the nodes are not 
         there, will add the nodes
@@ -1133,7 +1133,7 @@ def set_up_one_direction(src_graph:Hypergraph, targ_graph:Hypergraph, op_flag=Fa
     if op_flag: matfilename += 'op_'
     matfilename += 'source_dist_fw.csv'
     save_matrix_csv(distance_matrix, matfilename)
-    quit()
+    # quit()
     
     clock_time('Time to make the source distance matrix')
 
@@ -1176,6 +1176,7 @@ def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100, op_
     targ_distance_matrix, distance_matrix, missing_from_src, missing_from_targ = set_up_one_direction(src_graph, targ_graph, op_flag)
     
     clock_time('time to set up')
+    # quit()
     print('starting ricci curvature')
     # Now I have to parallelize this buddy
     calculate_target_orc_manager(npr, targ_distance_matrix, targ_graph, verbose, op_flag=op_flag)
@@ -1186,6 +1187,7 @@ def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100, op_
     update_orc_and_weights_iter_manager(npr, distance_matrix, src_graph, targ_graph, iteration=0, verbose=verbose, op_flag=op_flag)
 
     clock_time('Time to calc source ORC')
+    # quit()
     
     for i in range(1, tot_its + 1):
         print('Working on itteration', i)
@@ -1213,6 +1215,7 @@ def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100, op_
         if i == 1: 
             #TODO: fix this weirdness
             # take care of the getting started case
+            # quit()
             continue
         errorlist = []
         for e in src_graph.hyperedges:
@@ -1256,19 +1259,22 @@ def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100, op_
             write_scorecard('\n\n----- Results -----')
             write_scorecard(f'Source to target distance is {i}')
             break
+        quit()
     return 
     
 
 def one_direction_of_work_worker(tot_its = 100):   
-    quit()
+    # quit()
     calculate_target_orc_worker()
     # quit()
     update_orc_and_weights_iter_worker() 
+    # quit()
     cont=True
     cnt = 1
     while cont and (cnt<=tot_its):
         cont = update_orc_and_weights_iter_worker()
         cnt = cnt + 1
+        if cnt == 3: quit()
     return 
 
     
