@@ -456,6 +456,11 @@ class Hypergraph:
                 node2 = other_graph.hyperedges[e][1]
                 dist = self_dist_mat[self.node_index[node1]][self.node_index[node2]]
                 self.add_hyperedge(e, other_graph.hyperedges[e], [dist], verbose)
+            if isinstance(self, DirectedHypergraph):
+                (tail, head) = other_graph.hyperedges[e]
+                #TODO: implement for hypegraphs
+                dist = self_dist_mat[self.node_index[next(iter(tail))]][self.node_index[next(iter(head))]]
+                self.add_hyperedge(e, tail, head, [dist], verbose)
             #TODO: Implement for Directed
 
 
