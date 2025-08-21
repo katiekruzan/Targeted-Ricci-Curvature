@@ -422,26 +422,7 @@ class Hypergraph:
         except Exception as e:
             print(f"Gurobi Error: {e}\n for data {data}")
             return None 
-
-    def add_missing_edges(self, other_graph, verbose:bool) -> None:
-        '''The thing to be changed, need to happen in both directions. So we're combining them. 
-        Also should just be adding an edge, which might be an issue? But maybe not???
-
-        :param Hypergraph other_graph: The other graph we're working with. Should be of the same type as self.
-        :param bool verbose: verbose flag
-        '''
-        lastweights = [k[-1] for k in self.weights.values()]
-        # need to find the min weight of the graph 
-        minweight = min(lastweights)
-        placeholder = minweight/3.0
-        # or the max weight of the graph
-        maxweight = max(lastweights)
-        placeholder = maxweight * 333333333333.0
         
-        for e in set(other_graph.hyperedges) - set(self.hyperedges):
-            if isinstance(self, UndirectedHypergraph):
-                self.add_hyperedge(e, other_graph.hyperedges[e], [placeholder], verbose)
-            #TODO: Implement for Directed
             
     def add_missing_edges_shortest_path(self, other_graph, self_dist_mat, verbose:bool) -> None:
         '''So the idea, will be to add this edge, and then later delete it. Need to think about how to keep track of them
@@ -722,10 +703,6 @@ class DirectedHypergraph(Hypergraph):
         self.weights[hyperedge_id]= weight_list
         return
         
-    def add_missing_target_edges(self, targ_graph:Hypergraph):
-        #TODO: check if this works for Digraphs - need to have set up the same way as in undirected
-        for e in set(targ_graph.hyperedges) - set(self.hyperedges):
-            self.add_hyperedge(e, targ_graph.hyperedges[e][0], targ_graph.hyperedges[e][1], targ_graph.weights[e])
 
     def build_from_dataframe(self, df:pd.DataFrame, verbose=True) -> None:
         '''Build hypergraph from a DataFrame
