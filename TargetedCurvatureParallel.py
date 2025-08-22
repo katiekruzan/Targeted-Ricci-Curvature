@@ -1078,7 +1078,6 @@ def early_analysis(src_graph:Hypergraph, verbose:bool):
         print('The actual nodes:', src_graph.nodes)
         print('The actual edges with weights:', src_graph.weights)
         
-        # TODO: Add strongly connected check
         print("The hypergraph is weakly connected." if connected else "The hypergraph is not weakly connected.")
         
         print(f"Max Degree: {max_degree}")

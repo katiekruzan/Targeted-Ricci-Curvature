@@ -262,8 +262,19 @@ class Hypergraph:
             return None 
 
 
+class UndirectedHypergraph(Hypergraph):
+    def build_graph_from_csv(self, path):
+        df = pd.read_csv(path)
+        for _, row in df.iterrows():
+            u, v, weight = str(row[0].strip()), str(row[1].strip()), float(row[2])
+            edge_id = f"{u}_to_{v}"
+            print(edge_id, u, v, weight)
+            self.nodes.update([u, v])
+            self.hyperedges[edge_id] = [u, v]
+            self.weights[edge_id] = weight
+
 def update_orc_and_weights_iter_manager(npr, hypergraph:Hypergraph, dist_matrix, iteration, graphname, verbose=False):
-    file_name = f'outputfiles/dataset_targeted_curvature_{graphname}_iteration_{iteration}.csv'
+    file_name = f'outputfiles/dataset_untargeted_curvature_{graphname}_iteration_{iteration}.csv'
     # max_dist = max([dist for node_dists in dist_matrix.values() for dist in node_dists.values() if dist < float('inf')])
     # NOTE: for right now am going to make this 1
     updated_weights = {}
@@ -364,9 +375,18 @@ def one_direction_of_work_manager(npr, source_file, graphname, verbose=False):
     """
     Run Ricci flow a bunch of times and return the final dist matrix and graph
     """
-    source_graph = Hypergraph()
+    if directed_flag:
+        source_graph = DirectedHypergraph()
+    else:
+        source_graph = UndirectedHypergraph()
+    
+    # source_graph = Hypergraph()
     print('building the graph')
-    build_graph_from_csv(source_file, source_graph)
+    source_graph.build_graph_from_csv(source_file)
+    # build_graph_from_csv(source_file, source_graph)
+    
+    write_scorecard(f'Number of edges: {len(source_graph.hyperedges)}')
+    write_scorecard(f'Number of nodes: {len(source_graph.nodes)}')
     
     source_graph.node_index = {node: idx for idx, node in enumerate(list(source_graph.nodes))}
 
@@ -434,14 +454,14 @@ def one_direction_of_work_worker(w, tot_its = 100):
     return 
 
 
-def build_graph_from_csv(path, hypergraph):
-    df = pd.read_csv(path)
-    for _, row in df.iterrows():
-        u, v, weight = str(row[0]), str(row[1]), float(row[2])
-        edge_id = f"{u}_to_{v}"
-        hypergraph.nodes.update([u, v])
-        hypergraph.hyperedges[edge_id] = [u, v]
-        hypergraph.weights[edge_id] = weight
+# def build_graph_from_csv(path, hypergraph):
+#     df = pd.read_csv(path)
+#     for _, row in df.iterrows():
+#         u, v, weight = str(row[0]), str(row[1]), float(row[2])
+#         edge_id = f"{u}_to_{v}"
+#         hypergraph.nodes.update([u, v])
+#         hypergraph.hyperedges[edge_id] = [u, v]
+#         hypergraph.weights[edge_id] = weight
 
 
 def compute_distance_dict(hypergraph):
@@ -590,9 +610,17 @@ def worker(w, verbose = True):
 
 
 if __name__ == "__main__":
+    # TODO: Deal with this thought:
+    '''
+    The curvature is scale agnostic. But that doesn't make it stay stable necessarily
+    For the petersen graph, it should be the same. But it moves around.
+    Is that an us problem? Is that something else we've got going?
+    '''
     ITTS = 100
     start = time.time()
     
+    directed_flag = False
+    verbose = True
     absolute_change = True # False is relative change
     maximum_error = True # False is average error
     approx_emd = os.environ.get('APPROX') 
