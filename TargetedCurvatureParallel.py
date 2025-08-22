@@ -78,7 +78,10 @@ class Hypergraph:
     def update_node_index(self) -> None:
         '''The goal is to ensure there is a static node index for the graph. This function generates it
         '''
-        self.node_index = {node: idx for idx, node in enumerate(list(self.nodes))}
+        if len(self.node_index) == len(self.nodes):
+            return
+        else:
+            self.node_index = {node: idx for idx, node in enumerate(list(self.nodes))}
                         
     def is_2_uniform(self) -> bool:
         '''Check if size of each edge is 2
