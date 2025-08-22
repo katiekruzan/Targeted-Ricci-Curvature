@@ -21,132 +21,20 @@ class Hypergraph:
         self.ricci_curvature = {}
         self.node_index = {}
 
+
     def add_node(self, node: any) -> None:
         self.nodes.add(node)
         
+        
     def get_total_weight(self):
         return sum(self.weights.values())
+
 
     def add_ricci_curvature(self, hyperedge_id: str, orc: float) -> None:
         if hyperedge_id not in self.ricci_curvature:
             self.ricci_curvature[hyperedge_id] = []
         self.ricci_curvature[hyperedge_id].append(orc)
         
-    def find_hyperedges_containing_nodes(self, *nodes):
-        '''
-        Find hyperedges that contain any of the specified nodes.
-        # Ensure input is treated as a list even if a single node is passed
-        if isinstance(nodes, str):
-            nodes = [nodes]  # Convert single string node to a list
-        '''
-        nodes_set = set(nodes)  # Convert list to set for efficient intersection checks
-
-        # Handle different types of inputs
-        for node in nodes:
-            if isinstance(node, (list, set, tuple)):  # If the input is any kind of collection
-                nodes_set.update(node)  # Add all elements to the set
-            else:
-                nodes_set.add(node)  # Add the single element to the set
-
-        found_hyperedges = []
-        # Ensure all nodes in the set are in our nodes list
-        if not nodes_set.issubset(self.nodes):
-            print("Some nodes are not in the hypergraph.")
-        
-        # Iterate through all hyperedges
-        for hyperedge_id, hyperedge_nodes in self.hyperedges.items():
-            if nodes_set.intersection(hyperedge_nodes):  # Check if intersection is not empty
-                found_hyperedges.append(hyperedge_id)
-        
-        return found_hyperedges
-    
-    def find_hyperedges_containing_all_nodes(self, *nodes):
-        '''
-        Find hyperedges that contain all of the specified nodes.
-        # Ensure input is treated as a list even if a single node is passed
-        if isinstance(nodes, str):
-            nodes = [nodes]  # Convert single string node to a list
-        '''
-        nodes_set = set(nodes)  # Convert list to set for efficient intersection checks
-
-        # Handle different types of inputs
-        for node in nodes:
-            if isinstance(node, (list, set, tuple)):  # If the input is any kind of collection
-                nodes_set.update(node)  # Add all elements to the set
-            else:
-                nodes_set.add(node)  # Add the single element to the set
-
-        found_hyperedges = []
-        # Ensure all nodes in the set are in our nodes list
-        if not nodes_set.issubset(self.nodes):
-            print("Some nodes are not in the hypergraph.")
-        
-        # Iterate through all hyperedges
-        for hyperedge_id, hyperedge_nodes in self.hyperedges.items():
-            if nodes_set.issubset(nodes_set.intersection(hyperedge_nodes)):  # Check if intersection contains all nodes we want
-                found_hyperedges.append(hyperedge_id)
-        
-        return found_hyperedges
-    
-    def neighbours(self, node):
-        """
-        Find all nodes that share at least one hyperedge with the specified node.
-
-        :param node: The node for which to find neighbors.
-        :return: A set of neighboring nodes.
-        """
-        if node not in self.nodes:
-            return set()  # Return an empty set if the node does not exist
-
-        neighbours = set()
-        # Iterate through all hyperedges
-        for hyperedge in self.hyperedges.values():
-            if node in hyperedge:
-                neighbours.update(hyperedge)  # Add all nodes in the hyperedge
-
-        neighbours.discard(node)  # Remove the node itself from the set of neighbours
-        return neighbours
-    
-    def node_probability(self, node):
-        alpha = 0.1  # Self-transition probability factor
-        probability_distribution = {n: 0.0 for n in self.nodes}  # Initialize probabilities
-
-        if node not in self.nodes:
-            raise ValueError("Node does not exist in the hypergraph.")
-
-        # Calculate the denominator: sum of (|f| - 1) for all f containing node
-        denominator = 0
-        hyperedges_containing_node = self.find_hyperedges_containing_nodes(node) # the part that's no good for directed
-        for hyperedge_id in hyperedges_containing_node:
-            hyperedge = self.hyperedges[hyperedge_id]
-            denominator += (len(hyperedge) - 1)
-            
-        if denominator == 0:
-            # If the denominator is zero, we should handle this edge case gracefully.
-            probability_distribution[node] = 1.0
-            return probability_distribution
-
-        # Calculate the numerator for each neighbor node j and update their probabilities
-        for neighbour in self.neighbours(node):
-            hyperedges_containing_both = self.find_hyperedges_containing_nodes(node, neighbour)
-            numerator = len(hyperedges_containing_both)
-            '''
-            for hyperedge_id in hyperedges_containing_both:
-                hyperedge = self.hyperedges[hyperedge_id]
-                numerator += (len(hyperedge))
-            '''
-            # Update the probability of transitioning to the neighbor
-            probability_distribution[neighbour] = (1 - alpha) * numerator / denominator
-
-        # Assign the self-loop probability
-        probability_distribution[node] = alpha
-
-        # Normalization step
-        total_probability = sum(probability_distribution.values())
-        for n in probability_distribution:
-            probability_distribution[n] /= total_probability
-        
-        return probability_distribution
     
     def earthmover_distance_gurobi_distance_matrix(self, data, distance_matrix, verbose=False):
         '''Trying to combine the two functions into one
@@ -272,6 +160,146 @@ class UndirectedHypergraph(Hypergraph):
             self.nodes.update([u, v])
             self.hyperedges[edge_id] = [u, v]
             self.weights[edge_id] = weight
+            
+    def find_hyperedges_containing_all_nodes(self, *nodes):
+        '''
+        Find hyperedges that contain all of the specified nodes.
+        # Ensure input is treated as a list even if a single node is passed
+        if isinstance(nodes, str):
+            nodes = [nodes]  # Convert single string node to a list
+        '''
+        nodes_set = set(nodes)  # Convert list to set for efficient intersection checks
+
+        # Handle different types of inputs
+        for node in nodes:
+            if isinstance(node, (list, set, tuple)):  # If the input is any kind of collection
+                nodes_set.update(node)  # Add all elements to the set
+            else:
+                nodes_set.add(node)  # Add the single element to the set
+
+        found_hyperedges = []
+        # Ensure all nodes in the set are in our nodes list
+        if not nodes_set.issubset(self.nodes):
+            print("Some nodes are not in the hypergraph.")
+        
+        # Iterate through all hyperedges
+        for hyperedge_id, hyperedge_nodes in self.hyperedges.items():
+            if nodes_set.issubset(nodes_set.intersection(hyperedge_nodes)):  # Check if intersection contains all nodes we want
+                found_hyperedges.append(hyperedge_id)
+        
+        return found_hyperedges
+    
+    def find_hyperedges_containing_nodes(self, *nodes):
+        '''
+        Find hyperedges that contain any of the specified nodes.
+        # Ensure input is treated as a list even if a single node is passed
+        if isinstance(nodes, str):
+            nodes = [nodes]  # Convert single string node to a list
+        '''
+        nodes_set = set(nodes)  # Convert list to set for efficient intersection checks
+
+        # Handle different types of inputs
+        for node in nodes:
+            if isinstance(node, (list, set, tuple)):  # If the input is any kind of collection
+                nodes_set.update(node)  # Add all elements to the set
+            else:
+                nodes_set.add(node)  # Add the single element to the set
+
+        found_hyperedges = []
+        # Ensure all nodes in the set are in our nodes list
+        if not nodes_set.issubset(self.nodes):
+            print("Some nodes are not in the hypergraph.")
+        
+        # Iterate through all hyperedges
+        for hyperedge_id, hyperedge_nodes in self.hyperedges.items():
+            if nodes_set.intersection(hyperedge_nodes):  # Check if intersection is not empty
+                found_hyperedges.append(hyperedge_id)
+        
+        return found_hyperedges
+    
+    
+    
+    def neighbours(self, node):
+        """
+        Find all nodes that share at least one hyperedge with the specified node.
+
+        :param node: The node for which to find neighbors.
+        :return: A set of neighboring nodes.
+        """
+        if node not in self.nodes:
+            return set()  # Return an empty set if the node does not exist
+
+        neighbours = set()
+        # Iterate through all hyperedges
+        for hyperedge in self.hyperedges.values():
+            if node in hyperedge:
+                neighbours.update(hyperedge)  # Add all nodes in the hyperedge
+
+        neighbours.discard(node)  # Remove the node itself from the set of neighbours
+        return neighbours
+    
+    
+    def node_probability(self, node):
+        alpha = 0.1  # Self-transition probability factor
+        probability_distribution = {n: 0.0 for n in self.nodes}  # Initialize probabilities
+
+        if node not in self.nodes:
+            raise ValueError("Node does not exist in the hypergraph.")
+
+        # Calculate the denominator: sum of (|f| - 1) for all f containing node
+        denominator = 0
+        hyperedges_containing_node = self.find_hyperedges_containing_nodes(node) # the part that's no good for directed
+        for hyperedge_id in hyperedges_containing_node:
+            hyperedge = self.hyperedges[hyperedge_id]
+            denominator += (len(hyperedge) - 1)
+            
+        if denominator == 0:
+            # If the denominator is zero, we should handle this edge case gracefully.
+            probability_distribution[node] = 1.0
+            return probability_distribution
+
+        # Calculate the numerator for each neighbor node j and update their probabilities
+        for neighbour in self.neighbours(node):
+            hyperedges_containing_both = self.find_hyperedges_containing_nodes(node, neighbour)
+            numerator = len(hyperedges_containing_both)
+            '''
+            for hyperedge_id in hyperedges_containing_both:
+                hyperedge = self.hyperedges[hyperedge_id]
+                numerator += (len(hyperedge))
+            '''
+            # Update the probability of transitioning to the neighbor
+            probability_distribution[neighbour] = (1 - alpha) * numerator / denominator
+
+        # Assign the self-loop probability
+        probability_distribution[node] = alpha
+
+        # Normalization step
+        total_probability = sum(probability_distribution.values())
+        for n in probability_distribution:
+            probability_distribution[n] /= total_probability
+        
+        return probability_distribution
+            
+
+class DirectedHypergraph(Hypergraph):
+    def build_from_dataframe(self, df:pd.DataFrame, verbose=True) -> None:
+        # TODO: check for correctness in this file
+        '''Build hypergraph from a DataFrame
+
+        :param pd.DataFrame df: has the columns 'source', 'target', and 'weight'
+        :param bool verbose: verbose flag, defaults to True
+        '''
+        # make an edge from each row in the csv
+        # TODO: make actually work for hypergraphs
+        for _, row in df.iterrows():
+            node1 = row['source'].strip() #start
+            node2 = row['target'].strip() #end
+            weight = float(row['weight'])
+            edgeid = node1 + '_to_' + node2
+            self.add_hyperedge(edgeid, set([node1]), set([node2]), [weight])
+            if verbose:
+                print(f'Added hyperedge {edgeid} with head set {node1} and tail set {node2}')
+        return
 
 def update_orc_and_weights_iter_manager(npr, hypergraph:Hypergraph, dist_matrix, iteration, graphname, verbose=False):
     file_name = f'outputfiles/dataset_untargeted_curvature_{graphname}_iteration_{iteration}.csv'
@@ -393,6 +421,8 @@ def one_direction_of_work_manager(npr, source_file, graphname, verbose=False):
     for i in range(ITTS):
         if verbose:
             print('Starting itteration ', i)
+        
+        #TODO: persist the most recent distance matrix
         dist_matrix = compute_distance_dict(source_graph)
         update_orc_and_weights_iter_manager(npr, source_graph, dist_matrix, i, graphname, verbose)
         clock_time(f'Time for ORC {i}')
@@ -454,17 +484,9 @@ def one_direction_of_work_worker(w, tot_its = 100):
     return 
 
 
-# def build_graph_from_csv(path, hypergraph):
-#     df = pd.read_csv(path)
-#     for _, row in df.iterrows():
-#         u, v, weight = str(row[0]), str(row[1]), float(row[2])
-#         edge_id = f"{u}_to_{v}"
-#         hypergraph.nodes.update([u, v])
-#         hypergraph.hyperedges[edge_id] = [u, v]
-#         hypergraph.weights[edge_id] = weight
-
-
 def compute_distance_dict(hypergraph):
+    # TODO: implement for actual hypergraphs
+    # TODO: implement for directed graphs
     G = nx.Graph()
     for edge_id, (u, v) in hypergraph.hyperedges.items():
         G.add_edge(u, v, weight=hypergraph.weights[edge_id])
@@ -521,6 +543,7 @@ def clock_time(message:str)-> None:
     rt = now-start
     write_scorecard(f'{message}: {rt}')
     return
+
 
 def ricci_normalizing(R: float)->float: 
     '''
