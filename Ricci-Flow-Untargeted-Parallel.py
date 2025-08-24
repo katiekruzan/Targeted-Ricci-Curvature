@@ -41,10 +41,19 @@ class Hypergraph:
         '''
         # error handling
         # check data is node A node B
-        node_A, node_B, hyperedge_id = data
-        if node_A not in self.nodes or node_B not in self.nodes:
-            print(f"Node {node_A} or {node_B} does not exist in the Undirected hypergraph.")
-            return None  # Return None if either node does not exist
+        if isinstance(self, UndirectedHypergraph):
+            node_A, node_B, hyperedge_id = data
+            if node_A not in self.nodes or node_B not in self.nodes:
+                print(f"Node {node_A} or {node_B} does not exist in the Undirected hypergraph.")
+                return None  # Return None if either node does not exist
+            mu_A = self.node_probability(node_A)
+            mu_B = self.node_probability(node_B)
+        elif isinstance(self, DirectedHypergraph):
+            hyperedge_id = data 
+            if hyperedge_id not in self.hyperedges:
+                print(f"Edge {hyperedge_id} does not exist in the Directed hypergraph.")
+                return None  # Return None if edge does not exist
+            mu_A, mu_B = self.calculate_probability_distributions(hyperedge_id)
         
         if approx_emd:
             weight = self.weights[hyperedge_id] 
@@ -73,9 +82,6 @@ class Hypergraph:
             orc = (low + high)/2
             return 1-orc
         
-        mu_A = self.node_probability(node_A)
-        mu_B = self.node_probability(node_B)
-        
         # Convert distributions from dictionary to list format and print for debugging
         nodes_A = sorted(mu_A.keys())
         nodes_B = sorted(mu_B.keys())
@@ -99,7 +105,7 @@ class Hypergraph:
         if abs(total_mass_A - total_mass_B) > 1e-6:
             raise ValueError('The total mass of the distributions mu_A and mu_B are not equal.')
         
-        env = Env()
+        env = Env(empty=True)
         env.setParam("OutputFlag",0)
         env.start()
         
@@ -119,7 +125,6 @@ class Hypergraph:
             for x in mu_A:
                 for y in mu_B:
                     expr.addTerms(distance_matrix[x][y], variables[x,y])
-                    
             
             # Set the objective of the linear program to minimize the total cost.
             model.setObjective(expr, GRB.MINIMIZE)
@@ -137,12 +142,16 @@ class Hypergraph:
             # Check the model status and process the results.
             if model.status == GRB.OPTIMAL:
                 total_cost = model.getObjective().getValue()
+                model.dispose()
+                env.dispose()
                 return total_cost
             else:
                 print(f"No optimal solution found for data {data}")
                 print(f"The probability distributions are A: {mu_A} \nAnd B: {mu_B}")
                 print('Model Status', model.status)
                 print(f"The masses are {total_mass_A} for A and {total_mass_B} for B")
+                model.dispose()
+                env.dispose()
                 return None
             
         except Exception as e:
@@ -154,7 +163,7 @@ class UndirectedHypergraph(Hypergraph):
     def build_graph_from_csv(self, path, verbose = False):
         df = pd.read_csv(path)
         for _, row in df.iterrows():
-            u, v, weight = str(row[0].strip()), str(row[1].strip()), float(row[2])
+            u, v, weight = str(row[0]).strip(), str(row[1]).strip(), float(row[2])
             edge_id = f"{u}_to_{v}"
             print(edge_id, u, v, weight)
             self.nodes.update([u, v])
@@ -328,8 +337,8 @@ class DirectedHypergraph(Hypergraph):
         # TODO: make actually work for hypergraphs
         df = pd.read_csv(path)
         for _, row in df.iterrows():
-            node1 = row['source'].strip() #start
-            node2 = row['target'].strip() #end
+            node1 = str(row['source']).strip() #start
+            node2 = str(row['target']).strip() #end
             weight = float(row['weight'])
             edgeid = node1 + '_to_' + node2
             self.add_hyperedge(edgeid, set([node1]), set([node2]), weight)
@@ -346,6 +355,94 @@ class DirectedHypergraph(Hypergraph):
             G.add_edge(node1, node2, weight=self.weights[edge_id])
         fw = nx.floyd_warshall(G, weight='weight')
         return {a:dict(b) for a, b in fw.items()}
+    
+    
+    def calculate_probability_distributions(self, hyperedge_id:str):
+        '''Function to calculate the probability distributions over all nodes based on the hyperedge
+
+        :param str hyperedge_id: Name of the edge we're working with
+        :return _type_: _description_
+        '''
+        tail_set, head_set = self.hyperedges[hyperedge_id]
+
+        # Initialize mu_A and mu_B only for nodes in the tail set and head set respectively
+       
+        mu_A_in = {node: 0 for node in self.nodes}
+        for node in tail_set:
+            d_x_in = self.node_degree(node)[0]
+            if d_x_in != 0:
+                mu_A_in[node] = 0
+            else:
+                mu_A_in[node] = 1 / len(tail_set)
+       
+        mu_B_out = {node: 0 for node in self.nodes}
+        for node in head_set:
+            d_x_out = self.node_degree(node)[1]
+            if d_x_out != 0:
+                mu_B_out[node] = 0
+            else:
+                mu_B_out[node] = 1 / len(head_set)
+        
+        # Third Case
+        for edge in self.hyperedges:
+            if edge != hyperedge_id:
+                tail_set_prime, head_set_prime = self.hyperedges[edge]
+                common_tail_nodes = set(tail_set) & set(head_set_prime)
+                if common_tail_nodes:
+                    for node in common_tail_nodes:
+                        deg_x_in = self.node_degree(node)[0]
+                        for nodes in tail_set_prime:
+                            if deg_x_in != 0:  
+                                mu_A_in[nodes] += 1 / (len(tail_set) * len(tail_set_prime) * deg_x_in)
+
+                common_head_nodes = set(head_set) & set(tail_set_prime)
+                if common_head_nodes:
+                    for node in common_head_nodes:
+                        deg_x_out = self.node_degree(node)[1]
+                        for nodes in head_set_prime:
+                            if deg_x_out != 0:    
+                                mu_B_out[nodes] += 1 / (len(head_set) * len(head_set_prime) * deg_x_out)
+              
+        total_mass_A = sum(mu_A_in.values())
+        total_mass_B = sum(mu_B_out.values())
+        
+        # Normalize the probability distributions
+        if total_mass_A == 0:
+            mu_A_in ={node: mass for node, mass in mu_A_in.items()}
+        else:
+            mu_A_in = {node: mass / total_mass_A for node, mass in mu_A_in.items()}
+        
+        if total_mass_B == 0:
+            mu_B_out = {node: mass for node, mass in mu_B_out.items()}
+        else:
+            mu_B_out = {node: mass / total_mass_B for node, mass in mu_B_out.items()}
+        
+        return mu_A_in, mu_B_out
+    
+    
+    def node_degree(self, node) -> np.array:
+        '''Calculate the degree of a node. Degree is the number of hyperedges 
+        containing this node.
+        
+        Will always return a numpy array (in-deg, out-deg)
+    
+        :param _type_ node: the node we want to actually capture info for
+        :raises ValueError: _description_
+        :return np.array: array of degrees with (in-deg, out-deg)
+        '''
+        if node not in self.nodes:
+            raise ValueError("Node does not exist in the graph.")
+        
+        d_in_x = 0
+        d_out_x = 0
+        for _, (tail_set, head_set) in self.hyperedges.items():
+            if node in head_set:
+                d_in_x += 1
+            if node in tail_set:
+                d_out_x += 1  
+        
+        return [d_in_x, d_out_x]
+    
 
 
 def update_orc_and_weights_iter_manager(npr, hypergraph:Hypergraph, dist_matrix, iteration, graphname, verbose=False):
@@ -416,11 +513,14 @@ def update_orc_and_weights_iter_worker(w):
         if len(nodes) < 2: #hyper edges with less than 2 edges
             continue
 
-        u, v = nodes[0], nodes[1] # Notably will only work for graphs, not hyper graphs
-        if u not in dist_matrix or v not in dist_matrix[u]:
-            continue
-        
-        orc = 1 - graph.earthmover_distance_gurobi_distance_matrix((u, v, hyperedge_id), dist_matrix) 
+        if isinstance(graph, UndirectedHypergraph):
+            u, v = nodes[0], nodes[1] # Notably will only work for graphs, not hyper graphs
+            if u not in dist_matrix or v not in dist_matrix[u]:
+                continue
+            
+            orc = 1 - graph.earthmover_distance_gurobi_distance_matrix((u, v, hyperedge_id), dist_matrix)
+        elif isinstance(graph, DirectedHypergraph):
+            orc = 1 - graph.earthmover_distance_gurobi_distance_matrix(hyperedge_id, dist_matrix)
         
         # Normalize the curvature
         normalized_orc = ricci_normalizing(orc)
@@ -683,7 +783,7 @@ if __name__ == "__main__":
     start = time.time()
     
     directed_flag = False
-    verbose = True
+    verbose = False
     absolute_change = True # False is relative change
     maximum_error = True # False is average error
     approx_emd = os.environ.get('APPROX') 
