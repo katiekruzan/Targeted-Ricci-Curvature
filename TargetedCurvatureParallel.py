@@ -8,6 +8,8 @@ mpiexec -n 4 python .\katie_parallel.py
     :raises ValueError: _description_
     :raises ValueError: _description_
     :return _type_: _description_
+    
+#TODO: make the two scripts into one script? Or structure it better
 '''
 
 import pandas as pd
