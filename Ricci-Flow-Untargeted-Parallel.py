@@ -151,7 +151,7 @@ class Hypergraph:
 
 
 class UndirectedHypergraph(Hypergraph):
-    def build_graph_from_csv(self, path):
+    def build_graph_from_csv(self, path, verbose = False):
         df = pd.read_csv(path)
         for _, row in df.iterrows():
             u, v, weight = str(row[0].strip()), str(row[1].strip()), float(row[2])
@@ -218,7 +218,6 @@ class UndirectedHypergraph(Hypergraph):
         return found_hyperedges
     
     
-    
     def neighbours(self, node):
         """
         Find all nodes that share at least one hyperedge with the specified node.
@@ -279,10 +278,46 @@ class UndirectedHypergraph(Hypergraph):
             probability_distribution[n] /= total_probability
         
         return probability_distribution
+    
+    def compute_distance_dict(self, verbose = False):
+        # TODO: implement for actual hypergraphs
+        G = nx.Graph()
+        for edge_id, (u, v) in self.hyperedges.items():
+            G.add_edge(u, v, weight=self.weights[edge_id])
+        fw = nx.floyd_warshall(G, weight='weight')
+        return {a:dict(b) for a, b in fw.items()}
             
 
 class DirectedHypergraph(Hypergraph):
-    def build_from_dataframe(self, df:pd.DataFrame, verbose=True) -> None:
+    def add_hyperedge(self, hyperedge_id:str, tail_set:set, head_set:set, weight = 1, verbose=True) -> None:
+        '''Function to add a hyperedge to the hypergraph, if the nodes are not 
+        there, will add the nodes
+        
+        :param str hyperedge_id: the name you would like to be used for the hyperedge
+        :param set tail_set: a list of the tail nodes (nodes leaving from)
+        :param set head_set: a list of the head nodes (nodes going to)
+        :param numeric weight: Is going to be the most recent weight
+        :param bool verbose: verbose flag, defaults to True
+        '''
+        # Check if hyperedge already exists
+        if hyperedge_id in self.hyperedges:
+            print(f"Hyperedge {hyperedge_id} already exists with nodes {self.hyperedges[hyperedge_id]}")
+            return
+        
+        # Add missing nodes to the node set
+        for node in tail_set.union(head_set):
+            if node not in self.nodes:
+                self.add_node(node)
+                
+        # Add the hyperedge
+        if verbose:
+            f'Adding hyperedge {hyperedge_id} with tail nodes {tail_set} and head nodes {head_set}'
+        self.hyperedges[hyperedge_id] = (tail_set, head_set)
+        self.weights[hyperedge_id]= weight
+        return
+     
+     
+    def build_graph_from_csv(self, path: str, verbose=True) -> None:
         # TODO: check for correctness in this file
         '''Build hypergraph from a DataFrame
 
@@ -291,15 +326,27 @@ class DirectedHypergraph(Hypergraph):
         '''
         # make an edge from each row in the csv
         # TODO: make actually work for hypergraphs
+        df = pd.read_csv(path)
         for _, row in df.iterrows():
             node1 = row['source'].strip() #start
             node2 = row['target'].strip() #end
             weight = float(row['weight'])
             edgeid = node1 + '_to_' + node2
-            self.add_hyperedge(edgeid, set([node1]), set([node2]), [weight])
+            self.add_hyperedge(edgeid, set([node1]), set([node2]), weight)
             if verbose:
                 print(f'Added hyperedge {edgeid} with head set {node1} and tail set {node2}')
         return
+    
+    def compute_distance_dict(self, verbose=False):
+        # TODO: implement for actual hypergraphs
+        G = nx.Graph()
+        for edge_id, (u, v) in self.hyperedges.items():
+            node1 = list(u)[0]
+            node2 = list(v)[0]
+            G.add_edge(node1, node2, weight=self.weights[edge_id])
+        fw = nx.floyd_warshall(G, weight='weight')
+        return {a:dict(b) for a, b in fw.items()}
+
 
 def update_orc_and_weights_iter_manager(npr, hypergraph:Hypergraph, dist_matrix, iteration, graphname, verbose=False):
     file_name = f'outputfiles/dataset_untargeted_curvature_{graphname}_iteration_{iteration}.csv'
@@ -410,9 +457,10 @@ def one_direction_of_work_manager(npr, source_file, graphname, verbose=False):
     
     # source_graph = Hypergraph()
     print('building the graph')
-    source_graph.build_graph_from_csv(source_file)
+    source_graph.build_graph_from_csv(source_file, verbose=True)
     # build_graph_from_csv(source_file, source_graph)
     
+    write_scorecard(f'Type of graph: {type(source_graph)}')
     write_scorecard(f'Number of edges: {len(source_graph.hyperedges)}')
     write_scorecard(f'Number of nodes: {len(source_graph.nodes)}')
     
@@ -423,7 +471,7 @@ def one_direction_of_work_manager(npr, source_file, graphname, verbose=False):
             print('Starting itteration ', i)
         
         #TODO: persist the most recent distance matrix
-        dist_matrix = compute_distance_dict(source_graph)
+        dist_matrix = source_graph.compute_distance_dict()
         update_orc_and_weights_iter_manager(npr, source_graph, dist_matrix, i, graphname, verbose)
         clock_time(f'Time for ORC {i}')
         
@@ -470,7 +518,7 @@ def one_direction_of_work_manager(npr, source_file, graphname, verbose=False):
             write_scorecard(f'Source to target distance is {i}')
             break
 
-    final_dist_matrix = compute_distance_dict(source_graph)
+    final_dist_matrix = source_graph.compute_distance_dict()
     return final_dist_matrix, source_graph
 
 
@@ -484,14 +532,6 @@ def one_direction_of_work_worker(w, tot_its = 100):
     return 
 
 
-def compute_distance_dict(hypergraph):
-    # TODO: implement for actual hypergraphs
-    # TODO: implement for directed graphs
-    G = nx.Graph()
-    for edge_id, (u, v) in hypergraph.hyperedges.items():
-        G.add_edge(u, v, weight=hypergraph.weights[edge_id])
-    fw = nx.floyd_warshall(G, weight='weight')
-    return {a:dict(b) for a, b in fw.items()}
 
 
 def build_distance_vectors(dist_dict, nodes_order):
