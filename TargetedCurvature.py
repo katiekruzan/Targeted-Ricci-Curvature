@@ -542,6 +542,7 @@ class UndirectedHypergraph(Hypergraph):
         # Generate all combinations of pairs of nodes
         for node_A, node_B in combinations(nodes, 2):
             emd = self.earthmover_distance_gurobi_distance_matrix((node_A, node_B, hyperedge_id), distance_matrix, verbose)
+            print(emd)
             
             if emd is not None:
                 sum_emd += emd
@@ -766,6 +767,10 @@ def update_orc_and_weights_iter(distance_matrix:list[list], graph:Hypergraph, ta
                 graph.add_ricci_curvature(hyperedge_id, normalized_orc)
                 # grab the latest weight the weights
                 weight = graph.weights[hyperedge_id][-1]
+                
+                print(hyperedge_id, orc, normalized_orc)
+                
+                quit()
                 if iteration != 0:
                     orc_targ = targ_graph.ricci_curvature[hyperedge_id][-1]
                     if weight != 0:
@@ -909,7 +914,7 @@ def early_analysis(src_graph:Hypergraph, verbose:bool):
     return
 
         
-def one_direction_of_work(src_graph:Hypergraph, targ_graph:Hypergraph, tot_its = 100, op_flag=False):
+def one_direction_of_work(src_graph:Hypergraph, targ_graph:Hypergraph, tot_its = 100, op_flag=False, verbose=False):
     '''Find out if one direction converges from source to target
 
     :param Hypergraph src_graph: The source graph
@@ -1033,8 +1038,8 @@ if __name__ == "__main__":
     # try a network such that the sum of the two weights are the same
 
     directed_flag = False
-    verbose = False
-    approx_emd = True
+    verbose = True
+    approx_emd = False
      
     clean_output(verbose)
     
@@ -1085,7 +1090,7 @@ if __name__ == "__main__":
          
     clock_time('Time to analyze graphs')
      
-    one_direction_of_work(source_graph, target_graph, tot_its=100, op_flag=False)  
+    one_direction_of_work(source_graph, target_graph, tot_its=100, op_flag=False, verbose=verbose)  
     
     clock_time('Time for source->target')
     
