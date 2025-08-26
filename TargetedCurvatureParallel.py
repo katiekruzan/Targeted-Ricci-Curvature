@@ -22,6 +22,7 @@ import os
 from numbers import Number
 from mpi4py import MPI
 from pprint import pprint
+import ot
 
 COMM = MPI.COMM_WORLD
 
@@ -276,7 +277,8 @@ class Hypergraph:
         
         return max_degree, min_degree, avg_degree
     
-    def earthmover_distance_gurobi_distance_matrix(self, data, distance_matrix, verbose):
+    
+    def earthmover_distance_distance_matrix(self, data, distance_matrix, verbose):
         '''Trying to combine the two functions into one
 
         :param _type_ data: _description_
@@ -292,6 +294,7 @@ class Hypergraph:
         :return _type_: _description_
         '''
         global RND1
+        gurobi = True
         # error handling
         if isinstance(self, UndirectedHypergraph):
             # check data is node A node B
@@ -336,15 +339,11 @@ class Hypergraph:
             return 1-orc
         
         # Convert distributions from dictionary to list format and print for debugging
-        nodes_A = sorted(mu_A.keys())
-        nodes_B = sorted(mu_B.keys())
-        distribution1 = [mu_A[node] for node in nodes_A]
-        distribution2 = [mu_B[node] for node in nodes_B]
+        distribution1 = [mu_A[node] for node in self.node_index]
+        distribution2 = [mu_B[node] for node in self.node_index]
         
         # Print the distributions to verify correctness
         if verbose:
-            print("Nodes in mu_A:", nodes_A)
-            print("Nodes in mu_B:", nodes_B)
             print("Distribution mu_A:", distribution1)
             print("Distribution mu_B:", distribution2)
             
@@ -357,20 +356,32 @@ class Hypergraph:
         
         if abs(total_mass_A - total_mass_B) > 1e-6:
             raise ValueError('The total mass of the distributions mu_A and mu_B are not equal.')
+
+        if RND1:
+            clock_time('starting one job')
         
-        # Create a mapping of nodes to their indices in the distance matrix.
+        if gurobi: 
+            return self.earthmover_distance_gurobi_distance_matrix((mu_A, mu_B), distance_matrix, verbose)
+            
+        
+    
+    def earthmover_distance_gurobi_distance_matrix(self, data, distance_matrix, verbose):
+        '''This is now the section that is just gurobi-specific
+
+        '''
+        global RND1
+        
+        mu_A, mu_B = data
+            
+        # Convert distributions from dictionary to list format and print for debugging
         node_to_index = self.node_index
 
         if RND1:
             clock_time('starting one job')
         
-        # print('setting up')
         env = Env(empty=True)
-        # print('eh')
         env.setParam("OutputFlag",0)
-        # print('bleh')
         env.start()
-        # print('check in')
         
         try:
             # Create a new model in Gurobi.
@@ -419,7 +430,7 @@ class Hypergraph:
                 print(f"No optimal solution found for data {data}")
                 print(f"The probability distributions are A: {mu_A} \nAnd B: {mu_B}")
                 print('Model Status', model.status)
-                print(f"The masses are {total_mass_A} for A and {total_mass_B} for B")
+                # print(f"The masses are {total_mass_A} for A and {total_mass_B} for B")
                 model.dispose()
                 env.dispose()
                 return None
@@ -1257,12 +1268,12 @@ def manager(npr, verbose = True):
     # starting off things
     clean_output(verbose)
     
-    source_filename = os.environ.get('SOURCE_FILENAME')
-    target_filename = os.environ.get('TARGET_FILENAME')
+    # source_filename = os.environ.get('SOURCE_FILENAME')
+    # target_filename = os.environ.get('TARGET_FILENAME')
     # source_filename = 'ERgraph500nodep4.csv'
     # source_filename = 'ERgraph100nodep4.csv'
-    # source_filename = 'petersen/petersengraph.csv'
-    # target_filename = 'petersen/petersengraph_newbigweights.csv'
+    source_filename = 'petersen/petersengraph.csv'
+    target_filename = 'petersen/petersengraph_newbigweights.csv'
     # target_filename = 'rangechanges/ERgraph500n5changenewrange1000to2000v3.csv'
     # target_filename = 'rangechanges/ERgraph100n100changenewrange1000to2000v3.csv'
 
