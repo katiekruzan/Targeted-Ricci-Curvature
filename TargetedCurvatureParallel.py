@@ -666,7 +666,7 @@ class UndirectedHypergraph(Hypergraph):
         pair_count = 0
         # Generate all combinations of pairs of nodes
         for node_A, node_B in combinations(nodes, 2):
-            emd = self.earthmover_distance_gurobi_distance_matrix((node_A, node_B, hyperedge_id), distance_matrix, verbose=False)
+            emd = self.earthmover_distance_distance_matrix((node_A, node_B, hyperedge_id), distance_matrix, verbose=False)
             
             if emd is not None:
                 sum_emd += emd
@@ -971,7 +971,7 @@ def update_orc_and_weights_iter_worker():
         if isinstance(graph, UndirectedHypergraph):
             orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose)
         elif isinstance(graph, DirectedHypergraph): 
-            orc = 1 - graph.earthmover_distance_gurobi_distance_matrix(hyperedge_id, distance_matrix, verbose=False)
+            orc = 1 - graph.earthmover_distance_distance_matrix(hyperedge_id, distance_matrix, verbose=False)
         normalized_orc = ricci_normalizing(orc)
         graph.add_ricci_curvature(hyperedge_id, normalized_orc)
         weight = graph.weights[hyperedge_id][-1]
@@ -1064,7 +1064,7 @@ def calculate_target_orc_worker():
         if isinstance(graph, UndirectedHypergraph):
             orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose)
         elif isinstance(graph, DirectedHypergraph): 
-            orc = 1 - graph.earthmover_distance_gurobi_distance_matrix(hyperedge_id, distance_matrix, verbose=False)
+            orc = 1 - graph.earthmover_distance_distance_matrix(hyperedge_id, distance_matrix, verbose=False)
         if RND1:
             clock_time('finished ORC')
         normalized_orc = ricci_normalizing(orc)
@@ -1368,7 +1368,7 @@ def worker(w, verbose = True):
     return    
   
 if __name__ == "__main__": 
-    directed_flag = True
+    directed_flag = False
     verbose = True
     absolute_change = True # False is relative change
     maximum_error = True # False is average error
