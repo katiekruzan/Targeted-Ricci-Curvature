@@ -294,7 +294,7 @@ class Hypergraph:
         :return _type_: _description_
         '''
         global RND1
-        gurobi = True
+        # gurobi = True
         # error handling
         if isinstance(self, UndirectedHypergraph):
             # check data is node A node B
@@ -360,8 +360,12 @@ class Hypergraph:
         if RND1:
             clock_time('starting one job')
         
-        if gurobi: 
+        if gurobi_flag: 
             return self.earthmover_distance_gurobi_distance_matrix((mu_A, mu_B), distance_matrix, verbose)
+        else: # then we're in POT world
+            # ensure the distribution and the distance matrix line up. This should be the case if we've done floyd warshall for this distance matrix. Which I am going to assume we do.
+            W = ot.emd2(distribution1, distribution2, distance_matrix)
+            return W
             
         
     
@@ -1296,6 +1300,10 @@ def manager(npr, verbose = True):
         write_scorecard('Type of EMD: Approx')
     else: 
         write_scorecard('Type of EMD: Exact')
+    if gurobi_flag:
+        write_scorecard('EMD Solver: Gurobi')
+    else: 
+        write_scorecard('EMD Solver: Python Optimal Transport')
     clock_time('Time to read the data in seconds')
     
     if directed_flag:
@@ -1372,10 +1380,12 @@ if __name__ == "__main__":
     verbose = True
     absolute_change = True # False is relative change
     maximum_error = True # False is average error
+    gurobi_flag = False # use gurobi (other option is POT) Note: if approx=true, then this means nothing
     approx_emd = os.environ.get('APPROX')
     if approx_emd is None: # Make the default False
         approx_emd = 'False'
     approx_emd = eval(approx_emd)
+    if approx_emd: gurobi_flag = False
     
     start = time.time()
     
