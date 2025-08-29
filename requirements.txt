@@ -7,3 +7,4 @@ pytz==2025.1
 six==1.17.0
 tzdata==2025.1
 networkx==3.2.1
+POT==0.9.5
