@@ -150,7 +150,7 @@ class Hypergraph:
             
             for x in mu_A:
                 for y in mu_B:
-                    expr.addTerms(distance_matrix[self.node_index[x]][self.node_index[y]], variables[x,y])
+                    expr.addTerms(distance_matrix[x][y], variables[x,y])
             
             # Set the objective of the linear program to minimize the total cost.
             model.setObjective(expr, GRB.MINIMIZE)
