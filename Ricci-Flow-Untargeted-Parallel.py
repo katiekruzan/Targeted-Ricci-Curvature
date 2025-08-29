@@ -7,6 +7,7 @@ import time
 import os
 import networkx as nx
 from mpi4py import MPI
+import ot
 
 COMM = MPI.COMM_WORLD
 
@@ -36,11 +37,12 @@ class Hypergraph:
         self.ricci_curvature[hyperedge_id].append(orc)
         
     
-    def earthmover_distance_gurobi_distance_matrix(self, data, distance_matrix, verbose=False):
+    def earthmover_distance_distance_matrix(self, data, distance_matrix, verbose=False):
         '''Trying to combine the two functions into one
         '''
         # error handling
         # check data is node A node B
+        print('got here')
         if isinstance(self, UndirectedHypergraph):
             node_A, node_B, hyperedge_id = data
             if node_A not in self.nodes or node_B not in self.nodes:
@@ -82,16 +84,15 @@ class Hypergraph:
             orc = (low + high)/2
             return 1-orc
         
+        self.update_node_index()
+        print('now we got here')
+        
         # Convert distributions from dictionary to list format and print for debugging
-        nodes_A = sorted(mu_A.keys())
-        nodes_B = sorted(mu_B.keys())
-        distribution1 = [mu_A[node] for node in nodes_A]
-        distribution2 = [mu_B[node] for node in nodes_B]
+        distribution1 = [mu_A[node] for node in self.node_index]
+        distribution2 = [mu_B[node] for node in self.node_index]
         
         # Print the distributions to verify correctness
         if verbose:
-            print("Nodes in mu_A:", nodes_A)
-            print("Nodes in mu_B:", nodes_B)
             print("Distribution mu_A:", distribution1)
             print("Distribution mu_B:", distribution2)
             
@@ -105,8 +106,33 @@ class Hypergraph:
         if abs(total_mass_A - total_mass_B) > 1e-6:
             raise ValueError('The total mass of the distributions mu_A and mu_B are not equal.')
         
+        if gurobi_flag:
+            print('hey')
+            return self.earthmover_distance_gurobi_distance_matrix((mu_A, mu_B), distance_matrix, verbose)
+        else: # then we're in POT world
+            # ensure the distribution and the distance matrix line up. This should be the case if we've done floyd warshall for this distance matrix. Which I am going to assume we do.
+            print(distribution1)
+            print(distribution2)
+            #make the distance matrix
+            distmat = [[float('inf') for _ in range(len(self.nodes))] for _ in range(len(self.nodes))]
+            for i in self.node_index.keys():
+                for j in self.node_index.keys():
+                    distmat[self.node_index[i]][self.node_index[j]] = distance_matrix[i][j]
+            # print(distance_matrix)
+            # print(distmat)
+            # quit()
+            W = ot.emd2(distribution1, distribution2, distmat)
+            return W
+
+    
+    def earthmover_distance_gurobi_distance_matrix(self, data, distance_matrix, verbose=False):
+        '''Trying to combine the two functions into one
+        '''
+        print('in the next function')
+        mu_A, mu_B = data
+        
         env = Env(empty=True)
-        env.setParam("OutputFlag",0)
+        # env.setParam("OutputFlag",0)
         env.start()
         
         try:
@@ -124,7 +150,7 @@ class Hypergraph:
             
             for x in mu_A:
                 for y in mu_B:
-                    expr.addTerms(distance_matrix[x][y], variables[x,y])
+                    expr.addTerms(distance_matrix[self.node_index[x]][self.node_index[y]], variables[x,y])
             
             # Set the objective of the linear program to minimize the total cost.
             model.setObjective(expr, GRB.MINIMIZE)
@@ -149,7 +175,6 @@ class Hypergraph:
                 print(f"No optimal solution found for data {data}")
                 print(f"The probability distributions are A: {mu_A} \nAnd B: {mu_B}")
                 print('Model Status', model.status)
-                print(f"The masses are {total_mass_A} for A and {total_mass_B} for B")
                 model.dispose()
                 env.dispose()
                 return None
@@ -157,6 +182,16 @@ class Hypergraph:
         except Exception as e:
             print(f"Gurobi Error: {e}\n for data {data}")
             return None 
+
+
+    def update_node_index(self) -> None:
+        '''The goal is to ensure there is a static node index for the graph. This function generates it
+        '''
+        if len(self.node_index) == len(self.nodes):
+            return
+        else:
+            self.node_index = {node: idx for idx, node in enumerate(list(self.nodes))}
+
 
 
 class UndirectedHypergraph(Hypergraph):
@@ -516,11 +551,10 @@ def update_orc_and_weights_iter_worker(w):
         if isinstance(graph, UndirectedHypergraph):
             u, v = nodes[0], nodes[1] # Notably will only work for graphs, not hyper graphs
             if u not in dist_matrix or v not in dist_matrix[u]:
-                continue
-            
-            orc = 1 - graph.earthmover_distance_gurobi_distance_matrix((u, v, hyperedge_id), dist_matrix)
+                continue 
+            orc = 1 - graph.earthmover_distance_distance_matrix((u, v, hyperedge_id), dist_matrix)
         elif isinstance(graph, DirectedHypergraph):
-            orc = 1 - graph.earthmover_distance_gurobi_distance_matrix(hyperedge_id, dist_matrix)
+            orc = 1 - graph.earthmover_distance_distance_matrix(hyperedge_id, dist_matrix)
         
         # Normalize the curvature
         normalized_orc = ricci_normalizing(orc)
@@ -703,8 +737,10 @@ def manager(npr, verbose=False):
     # path2 = "inputfiles/jackie/com_Step2_regulonTargetsInfo_cDC2.csv"
     # path1 = "inputfiles/ERgraph500nodep4.csv"
     # path2 = "inputfiles/rangechanges/ERgraph500n5changenewrange100to200v3.csv"
-    source_filename = os.environ.get('SOURCE_FILENAME')
-    target_filename = os.environ.get('TARGET_FILENAME')
+    source_filename = 'petersen/petersengraph.csv'
+    target_filename =  'petersen/petersengraph_newbigweights.csv'
+    # source_filename = os.environ.get('SOURCE_FILENAME')
+    # target_filename = os.environ.get('TARGET_FILENAME')
     path1 = 'inputfiles/' + source_filename
     path2 = 'inputfiles/' + target_filename
     
@@ -783,13 +819,15 @@ if __name__ == "__main__":
     start = time.time()
     
     directed_flag = False
-    verbose = False
+    verbose = True
     absolute_change = True # False is relative change
     maximum_error = True # False is average error
+    gurobi_flag = True # use gurobi (other option is POT) Note: if approx=true, then this means nothing
     approx_emd = os.environ.get('APPROX') 
     if approx_emd is None: # Make the default False
-        approx_emd = False
+        approx_emd = 'False'
     approx_emd = eval(approx_emd)
+    if approx_emd: gurobi_flag = False
         
     RANK = COMM.Get_rank()
     SIZE = COMM.Get_size()
