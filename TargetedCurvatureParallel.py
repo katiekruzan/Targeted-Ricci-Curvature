@@ -1380,11 +1380,14 @@ if __name__ == "__main__":
     verbose = True
     absolute_change = True # False is relative change
     maximum_error = True # False is average error
-    gurobi_flag = False # use gurobi (other option is POT) Note: if approx=true, then this means nothing
+    gurobi_flag = os.environ.get('GUROBI_FLAG') 
     approx_emd = os.environ.get('APPROX')
     if approx_emd is None: # Make the default False
         approx_emd = 'False'
     approx_emd = eval(approx_emd)
+    if gurobi_flag is None: # make gurobi flag default false
+        gurobi_flag = 'False'
+    gurobi_flag = eval(gurobi_flag) 
     if approx_emd: gurobi_flag = False
     
     start = time.time()
