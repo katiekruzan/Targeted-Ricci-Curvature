@@ -811,18 +811,21 @@ if __name__ == "__main__":
     ITTS = 100
     start = time.time()
     
-    directed_flag = False
     verbose = False
     absolute_change = True # False is relative change
     maximum_error = True # False is average error
     gurobi_flag = os.environ.get('GUROBI_FLAG') 
     approx_emd = os.environ.get('APPROX') 
+    directed_flag = os.environ.get('DIRECTED_FLAG') 
     if approx_emd is None: # Make the default False
         approx_emd = 'False'
     approx_emd = eval(approx_emd)
     if gurobi_flag is None: # make gurobi flag default false
         gurobi_flag = 'False'
     gurobi_flag = eval(gurobi_flag) 
+    if directed_flag is None: # make directed flag default false
+        directed_flag = 'False'
+    directed_flag = eval(directed_flag) 
 
     if approx_emd: gurobi_flag = False
     
