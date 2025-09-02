@@ -750,6 +750,10 @@ def manager(npr, verbose=False):
         write_scorecard('Type of EMD: Approx')
     else: 
         write_scorecard('Type of EMD: Exact')
+    if gurobi_flag:
+        write_scorecard('EMD Solver: Gurobi')
+    else: 
+        write_scorecard('EMD Solver: Python Optimal Transport')
     
     clock_time('Time to read the data in seconds')
     
