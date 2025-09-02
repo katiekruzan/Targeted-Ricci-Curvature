@@ -737,10 +737,10 @@ def manager(npr, verbose=False):
     # path2 = "inputfiles/jackie/com_Step2_regulonTargetsInfo_cDC2.csv"
     # path1 = "inputfiles/ERgraph500nodep4.csv"
     # path2 = "inputfiles/rangechanges/ERgraph500n5changenewrange100to200v3.csv"
-    source_filename = 'petersen/petersengraph.csv'
-    target_filename =  'petersen/petersengraph_newbigweights.csv'
-    # source_filename = os.environ.get('SOURCE_FILENAME')
-    # target_filename = os.environ.get('TARGET_FILENAME')
+    # source_filename = 'petersen/petersengraph.csv'
+    # target_filename =  'petersen/petersengraph_newbigweights.csv'
+    source_filename = os.environ.get('SOURCE_FILENAME')
+    target_filename = os.environ.get('TARGET_FILENAME')
     path1 = 'inputfiles/' + source_filename
     path2 = 'inputfiles/' + target_filename
     
