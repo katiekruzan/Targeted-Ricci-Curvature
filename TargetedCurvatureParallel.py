@@ -1272,12 +1272,12 @@ def manager(npr, verbose = True):
     # starting off things
     clean_output(verbose)
     
-    # source_filename = os.environ.get('SOURCE_FILENAME')
-    # target_filename = os.environ.get('TARGET_FILENAME')
+    source_filename = os.environ.get('SOURCE_FILENAME')
+    target_filename = os.environ.get('TARGET_FILENAME')
     # source_filename = 'ERgraph500nodep4.csv'
     # source_filename = 'ERgraph100nodep4.csv'
-    source_filename = 'petersen/petersengraph.csv'
-    target_filename = 'petersen/petersengraph_newbigweights.csv'
+    # source_filename = 'petersen/petersengraph.csv'
+    # target_filename = 'petersen/petersengraph_newbigweights.csv'
     # target_filename = 'rangechanges/ERgraph500n5changenewrange1000to2000v3.csv'
     # target_filename = 'rangechanges/ERgraph100n100changenewrange1000to2000v3.csv'
 
