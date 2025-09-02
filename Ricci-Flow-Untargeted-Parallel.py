@@ -42,7 +42,6 @@ class Hypergraph:
         '''
         # error handling
         # check data is node A node B
-        print('got here')
         if isinstance(self, UndirectedHypergraph):
             node_A, node_B, hyperedge_id = data
             if node_A not in self.nodes or node_B not in self.nodes:
@@ -69,9 +68,7 @@ class Hypergraph:
             
             for n in commonNeighbors:
                 aEdges = self.find_hyperedges_containing_all_nodes(n,node_A)
-                # print(aEdges)
                 bEdges = self.find_hyperedges_containing_all_nodes(n,node_B)
-                # print(bEdges)
                 for na_id in aEdges:
                     for nb_id in bEdges:
                         naw = self.weights[na_id]
@@ -85,7 +82,6 @@ class Hypergraph:
             return 1-orc
         
         self.update_node_index()
-        print('now we got here')
         
         # Convert distributions from dictionary to list format and print for debugging
         distribution1 = [mu_A[node] for node in self.node_index]
@@ -107,20 +103,17 @@ class Hypergraph:
             raise ValueError('The total mass of the distributions mu_A and mu_B are not equal.')
         
         if gurobi_flag:
-            print('hey')
             return self.earthmover_distance_gurobi_distance_matrix((mu_A, mu_B), distance_matrix, verbose)
         else: # then we're in POT world
-            # ensure the distribution and the distance matrix line up. This should be the case if we've done floyd warshall for this distance matrix. Which I am going to assume we do.
-            print(distribution1)
-            print(distribution2)
-            #make the distance matrix
+            # ensure the distribution and the distance matrix line up. 
+            # This should be the case if we've done floyd warshall for this 
+            # distance matrix. Which I am going to assume we do.
+            # make the distance matrix
             distmat = [[float('inf') for _ in range(len(self.nodes))] for _ in range(len(self.nodes))]
             for i in self.node_index.keys():
                 for j in self.node_index.keys():
                     distmat[self.node_index[i]][self.node_index[j]] = distance_matrix[i][j]
-            # print(distance_matrix)
-            # print(distmat)
-            # quit()
+
             W = ot.emd2(distribution1, distribution2, distmat)
             return W
 
@@ -128,11 +121,11 @@ class Hypergraph:
     def earthmover_distance_gurobi_distance_matrix(self, data, distance_matrix, verbose=False):
         '''Trying to combine the two functions into one
         '''
-        print('in the next function')
         mu_A, mu_B = data
         
         env = Env(empty=True)
-        # env.setParam("OutputFlag",0)
+        if not verbose:
+            env.setParam("OutputFlag",0)
         env.start()
         
         try:
@@ -200,7 +193,6 @@ class UndirectedHypergraph(Hypergraph):
         for _, row in df.iterrows():
             u, v, weight = str(row[0]).strip(), str(row[1]).strip(), float(row[2])
             edge_id = f"{u}_to_{v}"
-            print(edge_id, u, v, weight)
             self.nodes.update([u, v])
             self.hyperedges[edge_id] = [u, v]
             self.weights[edge_id] = weight
@@ -499,7 +491,6 @@ def update_orc_and_weights_iter_manager(npr, hypergraph:Hypergraph, dist_matrix,
         chunksize = njobs//(npr-1)
         remainder = njobs % (npr-1)
         jobcnt = 0
-        print('Number of jobs ', njobs)
         
         while jobcnt < npr-1:
             # send the jobs
@@ -558,7 +549,6 @@ def update_orc_and_weights_iter_worker(w):
         
         # Normalize the curvature
         normalized_orc = ricci_normalizing(orc)
-        # print(f'Edge {hyperedge_id} with ORC {orc}\nNormalized ORC: {normalized_orc}')
         
         graph.add_ricci_curvature(hyperedge_id, normalized_orc)
 
@@ -601,8 +591,7 @@ def one_direction_of_work_manager(npr, source_file, graphname, verbose=False):
     source_graph.node_index = {node: idx for idx, node in enumerate(list(source_graph.nodes))}
 
     for i in range(ITTS):
-        if verbose:
-            print('Starting itteration ', i)
+        print('Starting itteration ', i)
         
         #TODO: persist the most recent distance matrix
         dist_matrix = source_graph.compute_distance_dict()
@@ -819,7 +808,7 @@ if __name__ == "__main__":
     start = time.time()
     
     directed_flag = False
-    verbose = True
+    verbose = False
     absolute_change = True # False is relative change
     maximum_error = True # False is average error
     gurobi_flag = os.environ.get('GUROBI_FLAG') 
