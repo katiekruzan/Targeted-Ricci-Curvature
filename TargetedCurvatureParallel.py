@@ -1045,7 +1045,7 @@ def calculate_target_orc_manager(npr, distance_matrix: list[list], graph:Hypergr
             for i in range(1, npr):
                 newgraph, jobs = COMM.recv(source=i, tag=11)
                 clock_time(f'gathered data from processor: {i}')
-                if True:
+                if verbose:
                     print('-> manager received data from worker', i, 'number of jobs', len(jobs))
                 for e in jobs: #sync up the graph
                     graph.add_ricci_curvature(e, newgraph.ricci_curvature[e][-1])
@@ -1377,7 +1377,7 @@ def worker(w, verbose = True):
   
 if __name__ == "__main__": 
     directed_flag = False
-    verbose = True
+    verbose = False
     absolute_change = True # False is relative change
     maximum_error = True # False is average error
     gurobi_flag = os.environ.get('GUROBI_FLAG') 
