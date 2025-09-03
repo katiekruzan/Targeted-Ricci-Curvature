@@ -581,7 +581,7 @@ def one_direction_of_work_manager(npr, source_file, graphname, verbose=False):
     
     # source_graph = Hypergraph()
     print('building the graph')
-    source_graph.build_graph_from_csv(source_file, verbose=True)
+    source_graph.build_graph_from_csv(source_file, verbose)
     # build_graph_from_csv(source_file, source_graph)
     
     write_scorecard(f'Type of graph: {type(source_graph)}')
@@ -655,8 +655,6 @@ def one_direction_of_work_worker(w, tot_its = 100):
     return 
 
 
-
-
 def build_distance_vectors(dist_dict, nodes_order):
     vectors = []
     for src in nodes_order:
@@ -713,9 +711,11 @@ def ricci_normalizing(R: float)->float:
     Using the normalization function sigma(R)/sigma(1) 
     Where sigma(x) is the standard sigmoid function 1/(1+\exp(-x))
 
+    # NOTE: I think this is quite odd. But also. I don't think it effects much.
     :param float R: the ORC value to be normalized 
     :return float: The normalized ORC value
     ''' 
+    # return (1/(1+ np.exp(-R)))
     return ((1 - np.exp(-1))/(1+ np.exp(-R)))
 
 def manager(npr, verbose=False):
