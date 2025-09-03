@@ -857,6 +857,7 @@ def ricci_normalizing(R: float)->float:
     :param float R: the ORC value to be normalized 
     :return float: The normalized ORC value
     ''' 
+    # return (1/(1+ np.exp(-R)))
     return ((1 - np.exp(-1))/(1+ np.exp(-R)))
 
 
@@ -1025,7 +1026,7 @@ def calculate_target_orc_manager(npr, distance_matrix: list[list], graph:Hypergr
         chunksize = njobs//(npr-1)
         remainder = njobs % (npr-1)
         jobcnt = 0
-        print('Number of jobs ', njobs)
+        # print('Number of jobs ', njobs)
         while jobcnt < npr-1:
             # send the jobs
             for i in range(1, npr):
@@ -1400,8 +1401,8 @@ if __name__ == "__main__":
     SIZE = COMM.Get_size()
     ITS = 100
     if RANK == 0:
-        manager(SIZE, verbose=False)
+        manager(SIZE, verbose)
     else: 
-        worker(RANK, verbose=False)
+        worker(RANK, verbose)
     print(f'node {RANK} made it to the end')
     # main()
