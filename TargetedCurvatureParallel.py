@@ -357,7 +357,7 @@ class Hypergraph:
         if abs(total_mass_A - total_mass_B) > 1e-6:
             raise ValueError('The total mass of the distributions mu_A and mu_B are not equal.')
 
-        if RND1:
+        if RND1 and verbose:
             clock_time('starting one job')
         
         if gurobi_flag: 
@@ -380,7 +380,7 @@ class Hypergraph:
         # Convert distributions from dictionary to list format and print for debugging
         node_to_index = self.node_index
 
-        if RND1:
+        if RND1 and verbose:
             clock_time('starting one job')
         
         env = Env(empty=True)
@@ -419,7 +419,7 @@ class Hypergraph:
             # print('bang')
             # Start the timer, solve the model, and calculate the time taken.
             model.optimize()
-            if RND1:
+            if RND1 and verbose:
                 clock_time('finished the model')
                 RND1 = False
             # print('done with the model')
@@ -947,7 +947,7 @@ def update_orc_and_weights_iter_manager(npr, distance_matrix:list[list], graph:H
                     COMM.send(SLICE, dest = i, tag=44)
                     if verbose:
                         print('-> manager sends job', jobcnt, 'to worker', i, 'number of jobs', len(SLICE[0]))
-                clock_time(f'manager has sent all the jobs')
+                if verbose: clock_time(f'manager has sent all the jobs')
                 # receive the jobs // sync the graphs.
                 for i in range(1, npr):
                     newgraph, jobs = COMM.recv(source=i, tag=11)
@@ -956,8 +956,7 @@ def update_orc_and_weights_iter_manager(npr, distance_matrix:list[list], graph:H
                     for e in jobs: #sync up the graph
                         graph.add_ricci_curvature(e, newgraph.ricci_curvature[e][-1])
                         graph.add_weights(e, newgraph.weights[e][-1])
-                        writer.writerow([e, newgraph.ricci_curvature[e][-1], newgraph.weights[e][-1]]) 
-                    # clock_time(f'gathered data from processor: {i}')
+                        writer.writerow([e, newgraph.ricci_curvature[e][-1], newgraph.weights[e][-1]])
     return
             
                     
@@ -1040,12 +1039,12 @@ def calculate_target_orc_manager(npr, distance_matrix: list[list], graph:Hypergr
                 COMM.send(SLICE, dest = i, tag=33)
                 if verbose:
                     print('-> manager sends job', jobcnt, 'to worker', i, 'number of jobs', len(SLICE[0]))
-            clock_time('manager sent all the jobs')
+            if verbose: clock_time('manager sent all the jobs')
             # receive the jobs // sync the graphs.
             for i in range(1, npr):
                 newgraph, jobs = COMM.recv(source=i, tag=11)
-                clock_time(f'gathered data from processor: {i}')
-                if verbose:
+                if verbose: 
+                    clock_time(f'gathered data from processor: {i}')
                     print('-> manager received data from worker', i, 'number of jobs', len(jobs))
                 for e in jobs: #sync up the graph
                     graph.add_ricci_curvature(e, newgraph.ricci_curvature[e][-1])
@@ -1069,13 +1068,13 @@ def calculate_target_orc_worker():
             orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose)
         elif isinstance(graph, DirectedHypergraph): 
             orc = 1 - graph.earthmover_distance_distance_matrix(hyperedge_id, distance_matrix, verbose=False)
-        if RND1:
+        if RND1 and verbose:
             clock_time('finished ORC')
         normalized_orc = ricci_normalizing(orc)
         graph.add_ricci_curvature(hyperedge_id, normalized_orc)
         # weight = graph.weights[hyperedge_id][-1]
             # writer.writerow([hyperedge_id, normalized_orc, weight])  
-    clock_time('finished worker now sending over')
+    if verbose: clock_time('finished worker now sending over')
     COMM.send((graph,jobs) , dest=0, tag=11)
     return
 
@@ -1134,7 +1133,7 @@ def set_up_one_direction(src_graph:Hypergraph, targ_graph:Hypergraph, op_flag=Fa
     matfilename += 'source_dist_fw.csv'
     save_matrix_csv(distance_matrix, matfilename)
     
-    clock_time('Time to make the source distance matrix')
+    if verbose: clock_time('Time to make the source distance matrix')
 
     target_distance_matrix = targ_graph.floyd_warshall()
     matfilename = 'outputfiles/'
@@ -1142,7 +1141,7 @@ def set_up_one_direction(src_graph:Hypergraph, targ_graph:Hypergraph, op_flag=Fa
     matfilename += 'target_dist_fw.csv'
     save_matrix_csv(target_distance_matrix, matfilename)
     
-    clock_time('Time to make the target distance matrix')
+    if verbose: clock_time('Time to make the target distance matrix')
     
     missing_from_src, missing_from_targ = [], []
 
@@ -1156,13 +1155,13 @@ def set_up_one_direction(src_graph:Hypergraph, targ_graph:Hypergraph, op_flag=Fa
         # add edges that are in the target but not the source
         src_graph.add_missing_edges_shortest_path(targ_graph, distance_matrix, verbose)
         targ_graph.add_missing_edges_shortest_path(src_graph, target_distance_matrix, verbose)
-        clock_time('time to add missing edges')
+        if verbose: clock_time('time to add missing edges')
         
         # recalculate the matrices
         distance_matrix = src_graph.floyd_warshall()
         
         target_distance_matrix = targ_graph.floyd_warshall()
-        clock_time('time to recalc the distances')
+        if verbose: clock_time('time to recalc the distances')
     
     print('len mising from source', len(missing_from_src))
     print('len mising from targ', len(missing_from_targ))
@@ -1174,21 +1173,21 @@ def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100, op_
     # One Direction of Work
     targ_distance_matrix, distance_matrix, missing_from_src, missing_from_targ = set_up_one_direction(src_graph, targ_graph, op_flag)
     
-    clock_time('time to set up')
+    if verbose: clock_time('time to set up')
     print('starting ricci curvature')
     
     calculate_target_orc_manager(npr, targ_distance_matrix, targ_graph, verbose, op_flag=op_flag)
 
-    clock_time('Time to calc target ORC')
+    if verbose: clock_time('Time to calc target ORC')
 
     update_orc_and_weights_iter_manager(npr, distance_matrix, src_graph, targ_graph, iteration=0, verbose=verbose, op_flag=op_flag)
 
-    clock_time('Time to calc source ORC')
+    if verbose: clock_time('Time to calc source ORC')
     
     for i in range(1, tot_its + 1):
         print('Working on itteration', i)
         distance_matrix_i = src_graph.floyd_warshall()
-        clock_time(f'finished distance matrix {i}')
+        if verbose: clock_time(f'finished distance matrix {i}')
         if i>1:
             if len(missing_from_src)> 0 or len(missing_from_targ)> 0:
                 # We're gonna to the reset here
@@ -1226,13 +1225,14 @@ def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100, op_
                     error = error / old
             if maximum_error:
                 if absolute_change and (error > 0.01):
-                    # if verbose:
-                    clock_time(f'unstable for edge {e} with error {error}')
+                    if verbose:
+                        clock_time(f'unstable for edge {e} with error {error}')
                     finustab = e
                     allstable = False
                     break
                 if (not absolute_change) and (error > 0.05): # relative change
-                    clock_time(f'unstable for edge {e} with error {error}')
+                    if verbose: 
+                        clock_time(f'unstable for edge {e} with error {error}')
                     finustab = e
                     allstable = False
                     break
@@ -1304,7 +1304,7 @@ def manager(npr, verbose = True):
         write_scorecard('EMD Solver: Gurobi')
     else: 
         write_scorecard('EMD Solver: Python Optimal Transport')
-    clock_time('Time to read the data in seconds')
+    if verbose: clock_time('Time to read the data in seconds')
     
     if directed_flag:
         source_graph = DirectedHypergraph()
@@ -1319,14 +1319,14 @@ def manager(npr, verbose = True):
     print('building target')
     target_graph.build_from_dataframe(data_target, verbose)
     
-    clock_time('Time to build the graphs')
+    if verbose: clock_time('Time to build the graphs')
     
     if not (source_graph.is_2_uniform() and target_graph.is_2_uniform()) :
         print('This has not been fully fleshed out for hypergraphs. Please give a 2-uniform graph')
         quit()
     
     early_analysis(source_graph, verbose)
-    clock_time('Time to analyze graphs')
+    if verbose: clock_time('Time to analyze graphs')
     
     # One Direction of Work
     one_direction_of_work_manager(npr, source_graph, target_graph, tot_its = ITS)
