@@ -466,7 +466,7 @@ class Hypergraph:
 
 
 class UndirectedHypergraph(Hypergraph):
-    def add_hyperedge(self, hyperedge_id:str, nodes:list, weight_list = [1], verbose=True)-> None:
+    def add_hyperedge(self, hyperedge_id:str, nodes:list, weight_list = [1], verbose=False)-> None:
         '''Add a hyperedge to the hypergraph. Automatically adds missing nodes.
 
         :param str hyperedge_id: the name you would like to be used for the hyperedge
@@ -496,7 +496,7 @@ class UndirectedHypergraph(Hypergraph):
         self.weights[hyperedge_id] = weight_list
         return
         
-    def build_from_dataframe(self, df:pd.DataFrame, verbose=True)-> None:
+    def build_from_dataframe(self, df:pd.DataFrame, verbose=False)-> None:
         '''Build hypergraph from a DataFrame
 
         :param pd.DataFrame df: has the columns 'source', 'target', and 'weight'
@@ -696,7 +696,7 @@ class UndirectedHypergraph(Hypergraph):
     
   
 class DirectedHypergraph(Hypergraph):
-    def add_hyperedge(self, hyperedge_id:str, tail_set:set, head_set:set, weight_list = [1], verbose=True) -> None:
+    def add_hyperedge(self, hyperedge_id:str, tail_set:set, head_set:set, weight_list = [1], verbose=False) -> None:
         '''Function to add a hyperedge to the hypergraph, if the nodes are not 
         there, will add the nodes
         
@@ -724,7 +724,7 @@ class DirectedHypergraph(Hypergraph):
         return
         
 
-    def build_from_dataframe(self, df:pd.DataFrame, verbose=True) -> None:
+    def build_from_dataframe(self, df:pd.DataFrame, verbose=False) -> None:
         '''Build hypergraph from a DataFrame
 
         :param pd.DataFrame df: has the columns 'source', 'target', and 'weight'

@@ -325,7 +325,7 @@ class UndirectedHypergraph(Hypergraph):
             
 
 class DirectedHypergraph(Hypergraph):
-    def add_hyperedge(self, hyperedge_id:str, tail_set:set, head_set:set, weight = 1, verbose=True) -> None:
+    def add_hyperedge(self, hyperedge_id:str, tail_set:set, head_set:set, weight = 1, verbose=False) -> None:
         '''Function to add a hyperedge to the hypergraph, if the nodes are not 
         there, will add the nodes
         
@@ -353,7 +353,7 @@ class DirectedHypergraph(Hypergraph):
         return
      
      
-    def build_graph_from_csv(self, path: str, verbose=True) -> None:
+    def build_graph_from_csv(self, path: str, verbose=False) -> None:
         # TODO: check for correctness in this file
         '''Build hypergraph from a DataFrame
 
