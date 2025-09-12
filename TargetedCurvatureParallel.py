@@ -858,7 +858,7 @@ def ricci_normalizing(R: float)->float:
     :return float: The normalized ORC value
     ''' 
     # return (1/(1+ np.exp(-R)))
-    return ((1 - np.exp(-1))/(1+ np.exp(-R)))
+    return (1/(1+ np.exp(-R)))
 
 
 def clean_output(verbose:bool) -> None:
