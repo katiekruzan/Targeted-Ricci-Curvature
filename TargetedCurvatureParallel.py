@@ -462,7 +462,6 @@ class Hypergraph:
                 #TODO: implement for hypegraphs
                 dist = self_dist_mat[self.node_index[next(iter(tail))]][self.node_index[next(iter(head))]]
                 self.add_hyperedge(e, tail, head, [dist], verbose)
-            #TODO: Implement for Directed
 
 
 class UndirectedHypergraph(Hypergraph):
@@ -1226,14 +1225,14 @@ def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100, op_
                     error = error / old
             if maximum_error:
                 if absolute_change and (error > 0.01):
-                    if verbose:
-                        clock_time(f'unstable for edge {e} with error {error}')
+                    # if verbose:
+                    clock_time(f'unstable for edge {e} with error {error}')
                     finustab = e
                     allstable = False
                     break
                 if (not absolute_change) and (error > 0.05): # relative change
-                    if verbose: 
-                        clock_time(f'unstable for edge {e} with error {error}')
+                    # if verbose: 
+                    clock_time(f'unstable for edge {e} with error {error}')
                     finustab = e
                     allstable = False
                     break
