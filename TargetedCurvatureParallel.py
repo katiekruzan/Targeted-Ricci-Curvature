@@ -462,7 +462,6 @@ class Hypergraph:
                 #TODO: implement for hypegraphs
                 dist = self_dist_mat[self.node_index[next(iter(tail))]][self.node_index[next(iter(head))]]
                 self.add_hyperedge(e, tail, head, [dist], verbose)
-            #TODO: Implement for Directed
 
 
 class UndirectedHypergraph(Hypergraph):
@@ -1197,17 +1196,18 @@ def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100, op_
         update_orc_and_weights_iter_manager(npr, distance_matrix_i, src_graph, targ_graph, iteration=i, verbose=verbose, op_flag=op_flag)
         clock_time(f'Time for ORC {i}')
         
-        # We will do a "reset" here
-        if len(missing_from_src)> 0 or len(missing_from_targ)> 0:
-            # We're gonna to the reset here
-            #first delete all the edges
-            for e in missing_from_src:
-                src_graph.remove_hyperedge(e)
-            for e in missing_from_targ:
-                targ_graph.remove_hyperedge(e)
+        def missing_reset():
+            # We will do a "reset" here
+            if len(missing_from_src)> 0 or len(missing_from_targ)> 0:
+                # We're gonna to the reset here
+                #first delete all the edges
+                for e in missing_from_src:
+                    src_graph.remove_hyperedge(e)
+                for e in missing_from_targ:
+                    targ_graph.remove_hyperedge(e)
+            
                 
         allstable = True
-        finustab = None
         if i == 1: 
             #TODO: fix this weirdness
             # take care of the getting started case
@@ -1228,14 +1228,14 @@ def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100, op_
                 if absolute_change and (error > 0.01):
                     if verbose:
                         clock_time(f'unstable for edge {e} with error {error}')
-                    finustab = e
                     allstable = False
+                    missing_reset()
                     break
                 if (not absolute_change) and (error > 0.05): # relative change
                     if verbose: 
                         clock_time(f'unstable for edge {e} with error {error}')
-                    finustab = e
                     allstable = False
+                    missing_reset()
                     break
             else:
                 errorlist.append(error)
@@ -1245,7 +1245,6 @@ def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100, op_
             avg_err = np.average(errorlist)
             if avg_err > 0.0001:
                 clock_time(f'unstable with average error {avg_err}')
-                finustab = e
                 allstable = False
         if allstable:
             #turn off all workers.
@@ -1278,7 +1277,7 @@ def manager(npr, verbose = True):
     # source_filename = 'ERgraph500nodep4.csv'
     # source_filename = 'ERgraph100nodep4.csv'
     # source_filename = 'petersen/petersengraph.csv'
-    # target_filename = 'petersen/petersengraph_newbigweights.csv'
+    # target_filename = 'petersen/petersengraphExtraEdge.csv'
     # target_filename = 'rangechanges/ERgraph500n5changenewrange1000to2000v3.csv'
     # target_filename = 'rangechanges/ERgraph100n100changenewrange1000to2000v3.csv'
 
