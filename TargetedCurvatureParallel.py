@@ -1205,8 +1205,7 @@ def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100, op_
                     src_graph.remove_hyperedge(e)
                 for e in missing_from_targ:
                     targ_graph.remove_hyperedge(e)
-            
-                
+             
         allstable = True
         if i == 1: 
             #TODO: fix this weirdness
@@ -1226,14 +1225,12 @@ def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100, op_
                     error = error / old
             if maximum_error:
                 if absolute_change and (error > 0.01):
-                    if verbose:
-                        clock_time(f'unstable for edge {e} with error {error}')
+                    clock_time(f'unstable for edge {e} with error {error}')
                     allstable = False
                     missing_reset()
                     break
                 if (not absolute_change) and (error > 0.05): # relative change
-                    if verbose: 
-                        clock_time(f'unstable for edge {e} with error {error}')
+                    clock_time(f'unstable for edge {e} with error {error}')
                     allstable = False
                     missing_reset()
                     break
