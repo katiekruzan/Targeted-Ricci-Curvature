@@ -1205,10 +1205,11 @@ def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100, op_
                     src_graph.remove_hyperedge(e)
                 for e in missing_from_targ:
                     targ_graph.remove_hyperedge(e)
-             
+         
         allstable = True
         if i == 1: 
             #TODO: fix this weirdness
+            missing_reset()
             # take care of the getting started case
             continue
         errorlist = []
@@ -1236,6 +1237,7 @@ def one_direction_of_work_manager(npr, src_graph, targ_graph, tot_its = 100, op_
                     break
             else:
                 errorlist.append(error)
+                missing_reset()
         #find the average error
         if not maximum_error: # AKA we're in average error zone
             # assumed to be in absolute error zone
