@@ -7,9 +7,11 @@ import os
 from mpi4py import MPI
 import time
 import pandas as pd
+import csv
 
 COMM = MPI.COMM_WORLD
 
+# helper functions
 def clean_output(verbose:bool) -> None:
     '''puts all the files (other than the README) in the outputfiles/ folder into a subfolder
 
@@ -31,7 +33,6 @@ def clean_output(verbose:bool) -> None:
                 print(f'Had issues moving {f} to a new folder')
     return
 
-
 def write_scorecard(line:str)-> None:
   '''function used to write the key results to a scorecard (for posterity)
 
@@ -51,7 +52,27 @@ def clock_time(message:str)-> None:
     write_scorecard(f'{message}: {rt}')
     return
   
+def save_matrix_csv(matrix:list[list], filename:str) -> None:
+  '''Function to save the matrix as a CSV file
 
+  :param list[list] matrix: matrix to be written
+  :param str filename: place to write it
+  '''    
+  pd.DataFrame(matrix).to_csv(filename, index=False, header=False)
+  return
+  
+def ricci_normalizing(R: float)->float: 
+  '''
+  Using the normalization function sigma(R)/sigma(1) 
+  Where sigma(x) is the standard sigmoid function 1/(1+\exp(-x))
+
+  :param float R: the ORC value to be normalized 
+  :return float: The normalized ORC value
+  ''' 
+  # return (1/(1+ np.exp(-R)))
+  return (1/(1+ np.exp(-R)))
+
+# process functions
 def early_analysis(src_graph:Hypergraph, verbose:bool):
     '''Get the information on the graph we're working on
 
@@ -88,6 +109,162 @@ def early_analysis(src_graph:Hypergraph, verbose:bool):
     write_scorecard(f"Average Degree: {avg_degree}") # for directed graphs, this should be equal.
     write_scorecard('----------------------------')
     return
+  
+def set_up_one_direction(src_graph:Hypergraph, targ_graph:Hypergraph, op_flag=False):
+  '''Setting up the one direction stuff. But in a separate function to help organize.
+  Returns the target and source distance matrices (also persists them), and the 
+  set of missing edges from source and target
+
+  :param Hypergraph src_graph: The source graph
+  :param Hypergraph targ_graph: The target graph
+  :param bool op_flag: used to indicated if we should add the 'op_' prefix, defaults to False
+  :return _type_: target_distance_matrix, distance_matrix, missing_from_src, missing_from_targ
+  '''  
+  print('working on distance matrices')
+  distance_matrix = src_graph.floyd_warshall()
+  matfilename = 'outputfiles/'
+  if op_flag: matfilename += 'op_'
+  matfilename += 'source_dist_fw.csv'
+  save_matrix_csv(distance_matrix, matfilename)
+  
+  if verbose: clock_time('Time to make the source distance matrix')
+
+  target_distance_matrix = targ_graph.floyd_warshall()
+  matfilename = 'outputfiles/'
+  if op_flag: matfilename += 'op_'
+  matfilename += 'target_dist_fw.csv'
+  save_matrix_csv(target_distance_matrix, matfilename)
+  
+  if verbose: clock_time('Time to make the target distance matrix')
+  
+  missing_from_src, missing_from_targ = [], []
+
+  if set(targ_graph.hyperedges) != set(src_graph.hyperedges):
+      print(set(targ_graph.hyperedges) - set(src_graph.hyperedges))
+      # logging the edges that are different
+      missing_from_src = set(targ_graph.hyperedges) - set(src_graph.hyperedges)
+      missing_from_targ = set(src_graph.hyperedges) - set(targ_graph.hyperedges)
+      
+      print ('Taking care of missing edges')
+      # add edges that are in the target but not the source
+      src_graph.add_missing_edges_shortest_path(targ_graph, distance_matrix, verbose)
+      targ_graph.add_missing_edges_shortest_path(src_graph, target_distance_matrix, verbose)
+      if verbose: clock_time('time to add missing edges')
+      
+      # recalculate the matrices
+      distance_matrix = src_graph.floyd_warshall()
+      
+      target_distance_matrix = targ_graph.floyd_warshall()
+      if verbose: clock_time('time to recalc the distances')
+  
+  print('len missing from source', len(missing_from_src))
+  print('len missing from targ', len(missing_from_targ))
+  
+  return target_distance_matrix, distance_matrix, missing_from_src, missing_from_targ
+
+
+# Manager Functions
+
+def calculate_target_orc_manager(npr:int, distance_matrix: list[list], graph:Hypergraph, verbose:bool, op_flag=False):
+  '''The function to calculate the staring info for the target graph
+
+  :param int npr: number of processors
+  :param list[list] distance_matrix: matrix of minimal distances from the floyd_warshall function
+  :param Hypergraph graph: the target graph
+  :param bool verbose: verbose flag
+  :param bool op_flag: option to mark the file as 'op' (used in second half of
+                         script), defaults to False
+  '''  
+  if op_flag:
+      file_name = f'outputfiles/op_dataset_target_graph_orc.csv'
+  else:
+      file_name = f'outputfiles/dataset_target_graph_orc.csv'
+  
+  with open(file_name, 'a', newline='') as file:
+      writer = csv.writer(file)
+      # Check if the file is empty to write headers
+      #TODO: maybe fix the top writing?
+      if file.tell() == 0:
+          writer.writerow(['Hyperedge ID', 'ORC', 'Weight'])
+          
+      # split the edges. Will have the remaining edges be split on the first r processors
+      edges = list(graph.hyperedges.keys())
+      njobs = len(edges)
+      chunksize = njobs//(npr-1)
+      remainder = njobs % (npr-1)
+      jobcnt = 0
+      
+      while jobcnt < npr-1:
+          # send the jobs
+          for i in range(1, npr):
+              jobcnt = jobcnt + 1 # notably, will basically be equal to i
+              jobstosend = []
+              if jobcnt <= remainder:
+                  jobstosend = edges[(jobcnt-1) * chunksize:jobcnt * chunksize] + [edges[-jobcnt]]
+              else: 
+                  jobstosend = edges[(jobcnt-1) * chunksize: jobcnt * chunksize]
+              SLICE = (jobstosend, distance_matrix, graph, file_name, verbose)
+              COMM.send(SLICE, dest = i, tag=33)
+              if verbose:
+                  print('-> manager sends job', jobcnt, 'to worker', i, 'number of jobs', len(SLICE[0]))
+          if verbose: clock_time('manager sent all the jobs')
+          # receive the jobs // sync the graphs.
+          for i in range(1, npr):
+              newgraph, jobs = COMM.recv(source=i, tag=11)
+              if verbose: 
+                  clock_time(f'gathered data from processor: {i}')
+                  print('-> manager received data from worker', i, 'number of jobs', len(jobs))
+              for e in jobs: #sync up the graph
+                  graph.add_ricci_curvature(e, newgraph.ricci_curvature[e][-1])
+                  graph.add_weights(e, newgraph.weights[e][-1])
+                  writer.writerow([e, newgraph.ricci_curvature[e][-1], newgraph.weights[e][-1]]) 
+  return
+
+
+
+def one_direction_of_work_manager(npr:int, src_graph:Hypergraph, targ_graph:Hypergraph, tot_its = 100, op_flag=False):
+  '''Doing the itterations from one graph to another
+
+  :param int npr: the number of processors
+  :param Hypergraph src_graph: The starting graph
+  :param Hypergraph targ_graph: The target graph
+  :param int tot_its: The maximum number of itterations to allow for this 
+    process, defaults to 100
+  :param bool op_flag: This is true if we want to add op_ as a prefix on the 
+    files. Used to determine if we're going the opposite direction, defaults to False
+  '''
+  # One Direction of Work
+  targ_distance_matrix, distance_matrix, missing_from_src, missing_from_targ = set_up_one_direction(src_graph, targ_graph, op_flag)
+  
+  if verbose: clock_time('time to set up')
+  print('starting ricci curvature')
+  
+  calculate_target_orc_manager(npr, targ_distance_matrix, targ_graph, verbose, op_flag=op_flag)
+  return
+
+# Worker functions
+def calculate_target_orc_worker():
+    specs = COMM.recv(source = 0, tag = 33)
+    if specs == -1: 
+        return
+    jobs, distance_matrix, graph, file_name, verbose = specs
+
+    for hyperedge_id in jobs:
+        if isinstance(graph, UndirectedHypergraph):
+            orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose)
+        elif isinstance(graph, DirectedHypergraph): 
+            orc = 1 - graph.earthmover_distance_distance_matrix(hyperedge_id, distance_matrix, verbose=False)
+        if RND1 and verbose:
+            clock_time('finished ORC')
+        normalized_orc = ricci_normalizing(orc)
+        graph.add_ricci_curvature(hyperedge_id, normalized_orc)
+    if verbose: clock_time('finished worker now sending over')
+    COMM.send((graph,jobs) , dest=0, tag=11)
+    return
+
+def one_direction_of_work_worker(tot_its = 100):   
+  calculate_target_orc_worker()
+  return 
 
 
 def manager(npr, verbose=True):
@@ -144,10 +321,11 @@ def manager(npr, verbose=True):
   early_analysis(source_graph, verbose)
   if verbose: clock_time('Time to analyze graphs')
   
-  
+  one_direction_of_work_manager(npr, source_graph, target_graph, tot_its = ITS)
   return
 
 def worker(w, verbose = True):
+  one_direction_of_work_worker(tot_its = ITS)
   return  
 
 

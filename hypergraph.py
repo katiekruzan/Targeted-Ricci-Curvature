@@ -8,6 +8,7 @@ import numpy as np
 from typing import *
 import pandas as pd
 from abc import ABC, abstractmethod
+from itertools import combinations
 
 class Hypergraph(ABC):
     '''This is the main class we use for they hypergraph object that stores 
@@ -59,14 +60,7 @@ class Hypergraph(ABC):
         :param str hyperedge_id: The hyperedge to be deleted
         '''
         del self.hyperedges[hyperedge_id]
-        return
-    
-    def get_underlying_edges(self) -> dict:
-        '''Get the underlying edges (undirected)
-
-        :return dict: dict from hyperedge id to lists of nodes in that edge
-        '''        
-        return self.hyperedges    
+        return  
     
     def update_node_index(self) -> None:
         '''The goal is to ensure there is a static node index for the graph. 
@@ -96,8 +90,6 @@ class Hypergraph(ABC):
         # I think this is saying an empty graph is weakly connected
         if not self.nodes: 
             return True
-
-        # TODO: make a .get_underlying_edges() function override for DirectedHypergraph
         
         edges = self.get_underlying_edges()
         
@@ -143,12 +135,9 @@ class Hypergraph(ABC):
         # Set the diagonal to 0 (distance from each node to itself) 
         for i in range(node_count):
             dist[i][i] = 0
-            
-        # pprint(dist)
         
         # Set the distance for directly connected nodes based on edge weights
         for hyperedge_id, nodes in self.hyperedges.items():
-            #TODO: figure this out for how to split it
             if isinstance(self, UndirectedHypergraph):
                 tail_set, head_set = nodes, nodes
             else: 
@@ -214,23 +203,17 @@ class Hypergraph(ABC):
         
         return max_degree, min_degree, avg_degree
     
-    def earthmover_distance_distance_matrix(self, data, distance_matrix, verbose):
-        '''Trying to combine the two functions into one
+    def earthmover_distance_distance_matrix(self, data, distance_matrix:list[list], verbose:bool) -> float:
+        '''Getting the actual EMD calculations. This is combining the work between 
+        Undirected and Directed graphs into a single function
 
         :param _type_ data: _description_
-        :param _type_ distance_matrix: _description_
-        :param _type_ verbose: _description_
-        :raises this: _description_
-        :raises ValueError: _description_
-        :raises ValueError: _description_
-        :raises ValueError: _description_
-        :raises ValueError: _description_
-        :raises ValueError: _description_
-        :raises ValueError: _description_
-        :return _type_: _description_
-        '''
+        :param list[list] distance_matrix: matrix of minimal distances from the floyd_warshall function
+        :param bool verbose: verbose flag
+        :raises ValueError: Will throw if the total masses aren't equal. Comes up if something has gone wrong in the EMD calculation
+        :return float: The actual EMD value
+        '''    
         global RND1
-        # gurobi = True
         # error handling
         if isinstance(self, UndirectedHypergraph):
             # check data is node A node B
@@ -393,6 +376,10 @@ class Hypergraph(ABC):
     @abstractmethod
     def node_degree(self):
         pass
+    
+    @abstractmethod
+    def get_underlying_edges(self):
+        pass
         
 class UndirectedHypergraph(Hypergraph):
     def build_from_dataframe(self, df:pd.DataFrame, verbose=False)-> None:
@@ -456,6 +443,13 @@ class UndirectedHypergraph(Hypergraph):
             dist = self_dist_mat[self.node_index[node1]][self.node_index[node2]]
             self.add_hyperedge(e, other_graph.hyperedges[e], [dist], verbose)
         return
+    
+    def get_underlying_edges(self) -> dict:
+        '''Get the underlying edges (undirected)
+
+        :return dict: dict from hyperedge id to lists of nodes in that edge
+        '''        
+        return self.hyperedges    
             
     def is_strongly_connected(self)-> bool:
         '''Checks if the graph is strongly connected. For Undirected, that's 
@@ -476,6 +470,109 @@ class UndirectedHypergraph(Hypergraph):
         if node not in self.nodes:
             raise ValueError("Node does not exist in the graph.")
         return sum(node in hyperedge for hyperedge in self.hyperedges.values())
+    
+    
+    def earthmover_distance_hyperedge_combinations(self, hyperedge_id:str, distance_matrix:list[list], verbose:bool) -> float:
+        '''This buddy gets the average EMD across the whole edge
+
+        :param str hyperedge_id: The identifier for the hyperedge
+        :param list[list] distance_matrix: matrix of minimal distances from the floyd_warshall function
+        :param bool verbose: verbose flag
+        :return float:  The average EMD for all permutations of node pairs, or None if the hyperedge does not exist or has errors.
+        '''       
+        if hyperedge_id not in self.hyperedges:
+            print(f"Hyperedge {hyperedge_id} does not exist.")
+            return None
+        
+        nodes = self.hyperedges[hyperedge_id]
+
+        if len(nodes) < 2:
+            return 1
+        
+        sum_emd = 0
+        pair_count = 0
+        # Generate all combinations of pairs of nodes
+        for node_A, node_B in combinations(nodes, 2):
+            emd = self.earthmover_distance_distance_matrix((node_A, node_B, hyperedge_id), distance_matrix, verbose=False)
+            
+            if emd is not None:
+                sum_emd += emd
+                pair_count += 1
+            else:
+                print('emd is none on nodes ', node_A, 'and', node_B)
+
+        if pair_count > 0:
+            # Compute the average EMD
+            average_emd = sum_emd /pair_count
+            weight = self.weights[hyperedge_id][-1]
+            if weight == 0:
+                # this is the orc 
+                # TODO: check to see if this makes sense for weight =0 in a real way. 
+                return -np.inf
+            else:
+                # this is the orc. This is the EMD/dist(u,v) and dist(u,v) will just be the weight of the edge
+                return 1 - average_emd/weight
+        else:
+            print(f"No valid EMD computations were possible. For hyperedge {hyperedge_id} with EMD {emd}")
+            return None
+        
+    def node_probability(self, node:any) -> dict:
+        '''Calculate the probability distributions of a specific node. This will
+        calculate 1/deg(u) spread out around the neighbors. But it's also a lazy 
+        distribution.
+
+        :param any node: should pull up a node
+        :raises ValueError: Will be raised if there is not a node of the name given in the graph
+        :return dict: mu will be {node: dist} dictionary
+        '''        
+        alpha = 0.1  # Self-transition probability factor
+        probability_distribution = {n: 0.0 for n in self.nodes}  # Initialize probabilities
+
+        if node not in self.nodes:
+            raise ValueError("Node does not exist in the hypergraph.")
+
+        # Calculate the denominator: sum of (|f| - 1) for all f containing node
+        denominator = 0
+        hyperedges_containing_node = self.find_hyperedges_containing_nodes(node) # the part that's no good for directed
+        for hyperedge_id in hyperedges_containing_node:
+            hyperedge = self.hyperedges[hyperedge_id]
+            denominator += (len(hyperedge) - 1)
+        
+        '''
+        # Calculate the denominator: sum of weight(f) for all f containing node
+        denominator = 0
+        hyperedges_containing_node = self.find_hyperedges_containing_nodes(node)
+        for hyperedge_id in hyperedges_containing_node:
+            hyperedge_weight = self.weights[hyperedge_id]
+            denominator += hyperedge_weight
+        '''
+            
+        if denominator == 0:
+            # If the denominator is zero, we should handle this edge case gracefully.
+            probability_distribution[node] = 1.0
+            return probability_distribution
+
+        # Calculate the numerator for each neighbor node j and update their probabilities
+        for neighbour in self.neighbours(node):
+            hyperedges_containing_both = self.find_hyperedges_containing_nodes(node, neighbour)
+            numerator = len(hyperedges_containing_both)
+            '''
+            for hyperedge_id in hyperedges_containing_both:
+                hyperedge = self.hyperedges[hyperedge_id]
+                numerator += (len(hyperedge))
+            '''
+            # Update the probability of transitioning to the neighbor
+            probability_distribution[neighbour] = (1 - alpha) * numerator / denominator
+
+        # Assign the self-loop probability
+        probability_distribution[node] = alpha
+
+        # Normalization step
+        total_probability = sum(probability_distribution.values())
+        for n in probability_distribution:
+            probability_distribution[n] /= total_probability
+        
+        return probability_distribution
     
             
     
