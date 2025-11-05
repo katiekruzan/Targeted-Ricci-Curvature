@@ -117,57 +117,6 @@ class Hypergraph:
         dfs(start_node)
         return visited == self.nodes   
     
-    # def is_strongly_connected(self)-> bool:
-    #     #TODO: This is only for directed hypergraphs.
-    #     '''Check if the underlying graph is strongly connected
-
-    #     :return bool: True if strongly connected
-    #     '''        
-    #     # I think this is saying an empty graph is strongly connected
-    #     if not self.nodes: 
-    #         return True
-
-    #     edges = self.hyperedges
-        
-    #     visited = set()
-
-    #     def dfs(node):
-    #         '''Depth First Search'''
-    #         if node in visited:
-    #             # print('got here')
-    #             return visited
-    #         visited.add(node)
-    #         for edge in edges.values():
-    #             # print(edge)
-    #             if isinstance(self, UndirectedHypergraph):
-    #                 if node in edge:
-    #                     for next_node in edge:
-    #                         # print(next_node)
-    #                         if next_node != node:
-    #                             dfs(next_node)
-    #             elif isinstance(self, DirectedHypergraph):
-    #                 # note tail and head
-    #                 tail, head = edge
-    #                 if node in tail:
-    #                     for next_node in head:
-    #                         # print(next_node)
-    #                         if next_node != node:
-    #                             dfs(next_node)
-
-    #     # Do DFS from each node
-    #     for v in iter(self.nodes):
-    #         visited = set()
-    #         # print('hellloooo')
-    #         dfs(v)
-    #         # write_scorecard(str(visited))
-    #         if visited != self.nodes:
-    #             # write_scorecard(f'not strongly connected based on vertex {v}')
-    #             # write_scorecard(str(visited))
-    #             return False
-    #         else: 
-    #             visited = set()
-    #     return True 
-    
     def floyd_warshall(self) -> list[list]:
         '''Use the Floyd-Warshall algorithm to find the shortest distances between
            each pair of vertices. Right now, if you cannot get from one node to 
@@ -432,6 +381,36 @@ class Hypergraph:
         
         
 class UndirectedHypergraph(Hypergraph):
+    def add_hyperedge(self, hyperedge_id:str, nodes:list, weight_list = [1], verbose=True)-> None:  
+        '''Add a hyperedge to the hypergraph. Automatically adds missing nodes.
+
+        :param str hyperedge_id: the name you would like to be used for the hyperedge
+        :param list nodes: a list of the adjacent nodes
+        :param list weight_list: Should start as a list with a single element (expect for weird cases), defaults to [1]
+        :param bool verbose: verbose flag, defaults to True
+        :raises ValueError: If the nodes is not a list, will raise this error
+        '''        
+        
+        # Ensure nodes is a list
+        if not isinstance(nodes, list):
+            raise ValueError("Nodes must be provided as a list")
+        
+        # Check if hyperedge already exists
+        if hyperedge_id in self.hyperedges:
+            print(f"Hyperedge {hyperedge_id} already exists with nodes {self.hyperedges[hyperedge_id]}")
+            return
+        # Add missing nodes to the node set
+        for node in nodes:
+            if node not in self.nodes:
+                self.add_node(node)
+
+        # Add the hyperedge
+        if verbose:
+            f'Adding hyperedge {hyperedge_id} with nodes {nodes}'
+        self.hyperedges[hyperedge_id] = nodes
+        self.weights[hyperedge_id] = weight_list
+        return
+    
     def add_missing_edges_shortest_path(self, other_graph, self_dist_mat, verbose:bool) -> None:
         '''So the idea, will be to add this edge, and then later delete it. Need to think about how to keep track of them
         For now, we're just testing on undirected. So will go forward on that.
@@ -445,6 +424,16 @@ class UndirectedHypergraph(Hypergraph):
             node2 = other_graph.hyperedges[e][1]
             dist = self_dist_mat[self.node_index[node1]][self.node_index[node2]]
             self.add_hyperedge(e, other_graph.hyperedges[e], [dist], verbose)
+        return
+            
+    def is_strongly_connected(self)-> bool:
+        '''Checks if the graph is strongly connected. For Undirected, that's 
+        the same as weakly connected
+
+        :return bool: True is the graph is strongly connected
+        '''     
+        return self.is_weakly_connected()   
+    
             
     
 class DirectedHypergraph(Hypergraph):
@@ -461,3 +450,53 @@ class DirectedHypergraph(Hypergraph):
             #TODO: implement for hypegraphs
             dist = self_dist_mat[self.node_index[next(iter(tail))]][self.node_index[next(iter(head))]]
             self.add_hyperedge(e, tail, head, [dist], verbose)
+            
+            
+    def get_underlying_edges(self) -> set:
+        '''Function to get the edges from the hyperedges.
+            We're basically going to make it look like an undirected graph
+
+        :return set: a set of edges with just the edgeid and then the nodes in a list
+        '''
+        edges = dict()
+        
+        for key in self.hyperedges.keys():
+            tail, head = self.hyperedges[key]
+            edges[key] = list(set(tail.union(head)))
+        return edges
+    
+    def is_strongly_connected(self)-> bool:
+        '''Check if the underlying graph is strongly connected
+
+        :return bool: True if strongly connected
+        '''        
+        # I think this is saying an empty graph is strongly connected
+        if not self.nodes: 
+            return True
+
+        edges = self.hyperedges
+        
+        visited = set()
+
+        def dfs(node):
+            '''Depth First Search'''
+            if node in visited:
+                # print('got here')
+                return visited
+            visited.add(node)
+            for edge in edges.values():
+                tail, head = edge
+                if node in tail:
+                    for next_node in head:
+                        if next_node != node:
+                            dfs(next_node)
+
+        # Do DFS from each node
+        for v in iter(self.nodes):
+            visited = set()
+            dfs(v)
+            if visited != self.nodes:
+                return False
+            else: 
+                visited = set()
+        return True 
