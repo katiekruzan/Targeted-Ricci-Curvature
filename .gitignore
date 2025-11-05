@@ -2,3 +2,4 @@
 inputfiles/
 outputfiles/
 nohup.out
+__pycache__/
