@@ -6,8 +6,10 @@
 from numbers import Number
 import numpy as np
 from typing import *
+import pandas as pd
+from abc import ABC, abstractmethod
 
-class Hypergraph:
+class Hypergraph(ABC):
     '''This is the main class we use for they hypergraph object that stores 
     Ricci curvatures as well
     '''    
@@ -212,7 +214,6 @@ class Hypergraph:
         
         return max_degree, min_degree, avg_degree
     
-    
     def earthmover_distance_distance_matrix(self, data, distance_matrix, verbose):
         '''Trying to combine the two functions into one
 
@@ -302,8 +303,6 @@ class Hypergraph:
             W = ot.emd2(distribution1, distribution2, distance_matrix)
             return W
             
-        
-    
     def earthmover_distance_gurobi_distance_matrix(self, data, distance_matrix, verbose):
         '''This is now the section that is just gurobi-specific
 
@@ -378,9 +377,41 @@ class Hypergraph:
             print(f"Gurobi Error: {e}\n for data {data}")
             return None 
         
+    # These are implemented in the subclasses
+    @abstractmethod
+    def is_strongly_connected(self):
+        pass
+    
+    @abstractmethod
+    def build_from_dataframe(self):
+        pass 
+    
+    @abstractmethod
+    def add_missing_edges_shortest_path(self):
+        pass
         
+    @abstractmethod
+    def node_degree(self):
+        pass
         
 class UndirectedHypergraph(Hypergraph):
+    def build_from_dataframe(self, df:pd.DataFrame, verbose=False)-> None:
+        '''Build hypergraph from a DataFrame
+
+        :param pd.DataFrame df: has the columns 'source', 'target', and 'weight'
+        :param bool verbose: verbose flag, defaults to True
+        '''        
+        # make an edge from each row in the csv
+        for _, row in df.iterrows():
+            node1 = row['source'].strip() #start
+            node2 = row['target'].strip() #end
+            weight = float(row['weight'])
+            edgeid = node1 + '_to_' + node2
+            self.add_hyperedge(edgeid, [node1, node2], [weight], verbose)
+            if verbose:
+                print(f'Added hyperedge {edgeid} between {node1} and {node2}')
+        return
+    
     def add_hyperedge(self, hyperedge_id:str, nodes:list, weight_list = [1], verbose=True)-> None:  
         '''Add a hyperedge to the hypergraph. Automatically adds missing nodes.
 
@@ -434,9 +465,39 @@ class UndirectedHypergraph(Hypergraph):
         '''     
         return self.is_weakly_connected()   
     
+    def node_degree(self, node) -> int:
+        ''' Calculate the degree of a node. Degree is the numer of hyperedges 
+        containing this node.
+
+        :param _type_ node: the node we want to actually capture info for
+        :raises ValueError: Raises if the node doesn't exist in the graph
+        :return int: The number of hyperedges containing the node
+        '''
+        if node not in self.nodes:
+            raise ValueError("Node does not exist in the graph.")
+        return sum(node in hyperedge for hyperedge in self.hyperedges.values())
+    
             
     
 class DirectedHypergraph(Hypergraph):
+    def build_from_dataframe(self, df:pd.DataFrame, verbose=False) -> None:
+        '''Build hypergraph from a DataFrame
+
+        :param pd.DataFrame df: has the columns 'source', 'target', and 'weight'
+        :param bool verbose: verbose flag, defaults to True
+        '''
+        # make an edge from each row in the csv
+        # TODO: make actually work for hypergraphs
+        for _, row in df.iterrows():
+            node1 = row['source'].strip() #start
+            node2 = row['target'].strip() #end
+            weight = float(row['weight'])
+            edgeid = node1 + '_to_' + node2
+            self.add_hyperedge(edgeid, set([node1]), set([node2]), [weight])
+            if verbose:
+                print(f'Added hyperedge {edgeid} with head set {node1} and tail set {node2}')
+        return
+    
     def add_missing_edges_shortest_path(self, other_graph, self_dist_mat, verbose:bool) -> None:
         '''So the idea, will be to add this edge, and then later delete it. Need to think about how to keep track of them
         For now, we're just testing on undirected. So will go forward on that.
@@ -500,3 +561,26 @@ class DirectedHypergraph(Hypergraph):
             else: 
                 visited = set()
         return True 
+    
+    def node_degree(self, node) -> np.array:
+        '''Calculate the degree of a node. Degree is the number of hyperedges 
+        containing this node.
+        
+        Will always return a numpy array (in-deg, out-deg)
+    
+        :param _type_ node: the node we want to actually capture info for
+        :raises ValueError: _description_
+        :return np.array: array of degrees with (in-deg, out-deg)
+        '''
+        if node not in self.nodes:
+            raise ValueError("Node does not exist in the graph.")
+        
+        d_in_x = 0
+        d_out_x = 0
+        for _, (tail_set, head_set) in self.hyperedges.items():
+            if node in head_set:
+                d_in_x += 1
+            if node in tail_set:
+                d_out_x += 1  
+        
+        return [d_in_x, d_out_x]
