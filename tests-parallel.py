@@ -493,11 +493,49 @@ def manager(npr, verbose=True):
   if verbose: clock_time('Time to analyze graphs')
   
   one_direction_of_work_manager(npr, source_graph, target_graph, tot_its = ITS)
+  
+  clock_time('Time for source->target')
+
+  write_scorecard('\n')
+
+  # Go the other way
+  print('Now checking Target to Source....')
+  
+  if directed_flag:
+      source_graph = DirectedHypergraph()
+      target_graph = DirectedHypergraph()
+  else:
+      source_graph = UndirectedHypergraph()
+      target_graph = UndirectedHypergraph()          
+  
+  # swap them
+  print('building source')
+  source_graph.build_from_dataframe(data_target, verbose)
+  print('building target')
+  target_graph.build_from_dataframe(data_source, verbose)
+  
+  one_direction_of_work_manager(npr, source_graph, target_graph, tot_its=ITS, op_flag = True)
+    
+  clock_time('Time for final')
+  
+  # tell the jobs to sleep (at the very end)
+  # send the jobs
+  for i in range(1, npr):
+      SLICE = -33
+      COMM.send(SLICE, dest = i, tag=55)
+      if verbose:
+          print(f'-> manager sends {SLICE} to worker', i)
   return
 
 def worker(w, verbose = True):
   one_direction_of_work_worker(tot_its = ITS)
-  
+  one_direction_of_work_worker(tot_its = ITS)
+  while True:
+    specs = COMM.recv(source = 0, tag = 55)
+    if specs == -33: 
+        if verbose:
+            print(f'Worker {w} goes to sleep')
+        break
   return  
 
 
