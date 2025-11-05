@@ -203,7 +203,7 @@ def calculate_target_orc_manager(npr:int, distance_matrix: list[list], graph:Hyp
                   jobstosend = edges[(jobcnt-1) * chunksize:jobcnt * chunksize] + [edges[-jobcnt]]
               else: 
                   jobstosend = edges[(jobcnt-1) * chunksize: jobcnt * chunksize]
-              SLICE = (jobstosend, distance_matrix, graph, file_name, verbose)
+              SLICE = (jobstosend, distance_matrix, graph, verbose)
               COMM.send(SLICE, dest = i, tag=33)
               if verbose:
                   print('-> manager sends job', jobcnt, 'to worker', i, 'number of jobs', len(SLICE[0]))
@@ -218,6 +218,63 @@ def calculate_target_orc_manager(npr:int, distance_matrix: list[list], graph:Hyp
                   graph.add_ricci_curvature(e, newgraph.ricci_curvature[e][-1])
                   graph.add_weights(e, newgraph.weights[e][-1])
                   writer.writerow([e, newgraph.ricci_curvature[e][-1], newgraph.weights[e][-1]]) 
+  return
+
+def update_orc_and_weights_iter_manager(npr:int, distance_matrix:list[list], graph:Hypergraph, targ_graph:Hypergraph,  iteration:int, verbose:bool, file_format='csv', op_flag = False) -> None:
+  '''The main function of this whole sheboodle. Run the whole process for the given itteration
+
+  :param int npr: the number of processors
+  :param list[list] distance_matrix: matrix of minimal distances from the floyd_warshall function
+  :param Hypergraph graph: the source graph we're looking at (or at least its current itteration)
+  :param Hypergraph targ_graph: The target graph
+  :param int iteration: the round we're on
+  :param bool verbose: verbose flag
+  :param str file_format: defaults to 'csv'
+  :param bool op_flag: option to mark the file as 'op' (used in second half of
+                         script), defaults to False
+  '''   
+  if op_flag:
+      file_name = f'outputfiles/op_dataset_targeted_curvature_iteration_{iteration}.{file_format}'
+  else:
+      file_name = f'outputfiles/dataset_targeted_curvature_iteration_{iteration}.{file_format}'
+  
+  with open(file_name, 'a', newline='') as file:
+      if file_format == 'csv':
+          writer = csv.writer(file)
+          # Check if the file is empty to write headers
+          if file.tell() == 0:
+              writer.writerow(['Hyperedge ID', 'ORC: (based on t-1 weights)', 'Weight:t'])
+              
+          # split the edges. Will have the remaining edges be split on the first r processors
+          edges = list(graph.hyperedges.keys())
+          njobs = len(graph.hyperedges)
+          chunksize = njobs//(npr-1)
+          remainder = njobs % (npr-1)
+          jobcnt = 0
+          
+          while jobcnt < npr-1:
+              # send the jobs
+              for i in range(1, npr):
+                  jobcnt = jobcnt + 1 # notably, will basically be equal to i
+                  jobstosend = []
+                  if jobcnt <= remainder:
+                      jobstosend = edges[(jobcnt-1) * chunksize:jobcnt * chunksize] + [edges[-jobcnt]]
+                  else: 
+                      jobstosend = edges[(jobcnt-1) * chunksize: jobcnt * chunksize]
+                  SLICE = (jobstosend, distance_matrix, graph, targ_graph, verbose, iteration)
+                  COMM.send(SLICE, dest = i, tag=44)
+                  if verbose:
+                      print('-> manager sends job', jobcnt, 'to worker', i, 'number of jobs', len(SLICE[0]))
+              if verbose: clock_time(f'manager has sent all the jobs')
+              # receive the jobs // sync the graphs.
+              for i in range(1, npr):
+                  newgraph, jobs = COMM.recv(source=i, tag=11)
+                  if verbose:
+                      print('-> manager received data from worker', i, 'number of jobs', len(jobs))
+                  for e in jobs: #sync up the graph
+                      graph.add_ricci_curvature(e, newgraph.ricci_curvature[e][-1])
+                      graph.add_weights(e, newgraph.weights[e][-1])
+                      writer.writerow([e, newgraph.ricci_curvature[e][-1], newgraph.weights[e][-1]])
   return
 
 
@@ -239,14 +296,92 @@ def one_direction_of_work_manager(npr:int, src_graph:Hypergraph, targ_graph:Hype
   print('starting ricci curvature')
   
   calculate_target_orc_manager(npr, targ_distance_matrix, targ_graph, verbose, op_flag=op_flag)
+  
+  if verbose: clock_time('Time to calc target ORC')
+  
+  update_orc_and_weights_iter_manager(npr, distance_matrix, src_graph, targ_graph, iteration=0, verbose=verbose, op_flag=op_flag)
+
+  if verbose: clock_time('Time to calc source ORC')
+  
+  for i in range(1, tot_its + 1):
+    print('Working on itteration', i)
+    distance_matrix_i = src_graph.floyd_warshall()
+    if verbose: clock_time(f'finished distance matrix {i}')
+    if i>1:
+        if len(missing_from_src)> 0 or len(missing_from_targ)> 0:
+            # We're gonna to the reset here
+            src_graph.add_missing_edges_shortest_path(targ_graph, distance_matrix, verbose)
+            targ_graph.add_missing_edges_shortest_path(src_graph, targ_distance_matrix, verbose)
+    update_orc_and_weights_iter_manager(npr, distance_matrix_i, src_graph, targ_graph, iteration=i, verbose=verbose, op_flag=op_flag)
+    clock_time(f'Time for ORC {i}')
+    
+    def missing_reset():
+        # We will do a "reset" here
+        if len(missing_from_src)> 0 or len(missing_from_targ)> 0:
+            # We're gonna to the reset here
+            #first delete all the edges
+            for e in missing_from_src:
+                src_graph.remove_hyperedge(e)
+            for e in missing_from_targ:
+                targ_graph.remove_hyperedge(e)
+      
+    allstable = True
+    if i == 1: 
+        #TODO: fix this weirdness
+        missing_reset()
+        # take care of the getting started case
+        continue
+    errorlist = []
+    for e in src_graph.hyperedges:
+        clist = src_graph.ricci_curvature[e]
+        old = clist[-2]
+        new = clist[-1]
+        if old != 0:
+            if absolute_change: error = abs(old-new)
+            else: error = abs((old-new)/old) #relative change
+        else: 
+            error = abs(old-new)
+            if (not absolute_change):
+                error = error / old
+        if maximum_error:
+            if absolute_change and (error > 0.01):
+                clock_time(f'unstable for edge {e} with error {error}')
+                allstable = False
+                missing_reset()
+                break
+            if (not absolute_change) and (error > 0.05): # relative change
+                clock_time(f'unstable for edge {e} with error {error}')
+                allstable = False
+                missing_reset()
+                break
+        else:
+            errorlist.append(error)
+            missing_reset()
+    #find the average error
+    if not maximum_error: # AKA we're in average error zone
+        # assumed to be in absolute error zone
+        avg_err = np.average(errorlist)
+        if avg_err > 0.0001:
+            clock_time(f'unstable with average error {avg_err}')
+            allstable = False
+    if allstable:
+        #turn off all workers.
+        for k in range(1,npr):
+            COMM.send(-1, dest = k, tag = 44)
+        print('STABILIZED! Source to target distance is ',i)
+        write_scorecard('\n\n----- Results -----')
+        write_scorecard(f'Source to target distance is {i}')
+        break
   return
+
+
 
 # Worker functions
 def calculate_target_orc_worker():
     specs = COMM.recv(source = 0, tag = 33)
     if specs == -1: 
         return
-    jobs, distance_matrix, graph, file_name, verbose = specs
+    jobs, distance_matrix, graph, verbose = specs
 
     for hyperedge_id in jobs:
         if isinstance(graph, UndirectedHypergraph):
@@ -258,9 +393,48 @@ def calculate_target_orc_worker():
     if verbose: clock_time('finished worker now sending over')
     COMM.send((graph,jobs) , dest=0, tag=11)
     return
+  
+def update_orc_and_weights_iter_worker() -> bool:
+  '''The actual worker processor doing the work of the orc itteration. the 
+  larger description is in update_orc_and_weights_iter_manager(). But will throw
+  a false if its supposed to stop
+
+  :return bool: This is how the loop will end and continue to the next part of the worker script
+  '''  
+  specs = COMM.recv(source = 0, tag = 44)
+  if specs == -1: 
+      return False
+  jobs, distance_matrix, graph, targ_graph, verbose, itteration = specs
+
+  for hyperedge_id in jobs:
+      if isinstance(graph, UndirectedHypergraph):
+          orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, approx_emd, gurobi_flag, verbose)
+      elif isinstance(graph, DirectedHypergraph): 
+          orc = 1 - graph.earthmover_distance_distance_matrix(hyperedge_id, distance_matrix, approx_emd, gurobi_flag, verbose=False)
+      normalized_orc = ricci_normalizing(orc)
+      graph.add_ricci_curvature(hyperedge_id, normalized_orc)
+      weight = graph.weights[hyperedge_id][-1]
+      if itteration != 0: #update the weights
+          orc_targ = targ_graph.ricci_curvature[hyperedge_id][-1]
+          if weight != 0:
+              #simple version
+              step = 1
+              wtplus1 = weight*(1  - step*(normalized_orc - orc_targ))
+              normalized_weight = wtplus1
+          else:
+              normalized_weight = 0
+          graph.add_weights(hyperedge_id, normalized_weight)
+  COMM.send((graph,jobs) , dest=0, tag=11)
+  return True
 
 def one_direction_of_work_worker(tot_its = 100):   
   calculate_target_orc_worker()
+  update_orc_and_weights_iter_worker() 
+  cont = True
+  cnt = 1
+  while cont and (cnt<=tot_its):
+    cont = update_orc_and_weights_iter_worker()
+    cnt = cnt+1
   return 
 
 
@@ -323,6 +497,7 @@ def manager(npr, verbose=True):
 
 def worker(w, verbose = True):
   one_direction_of_work_worker(tot_its = ITS)
+  
   return  
 
 
