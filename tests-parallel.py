@@ -221,7 +221,6 @@ def calculate_target_orc_manager(npr:int, distance_matrix: list[list], graph:Hyp
   return
 
 
-
 def one_direction_of_work_manager(npr:int, src_graph:Hypergraph, targ_graph:Hypergraph, tot_its = 100, op_flag=False):
   '''Doing the itterations from one graph to another
 
@@ -251,11 +250,9 @@ def calculate_target_orc_worker():
 
     for hyperedge_id in jobs:
         if isinstance(graph, UndirectedHypergraph):
-            orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, verbose)
+            orc = graph.earthmover_distance_hyperedge_combinations(hyperedge_id, distance_matrix, approx_emd, gurobi_flag, verbose)
         elif isinstance(graph, DirectedHypergraph): 
-            orc = 1 - graph.earthmover_distance_distance_matrix(hyperedge_id, distance_matrix, verbose=False)
-        if RND1 and verbose:
-            clock_time('finished ORC')
+            orc = 1 - graph.earthmover_distance_distance_matrix(hyperedge_id, distance_matrix, approx_emd, gurobi_flag, verbose=False)
         normalized_orc = ricci_normalizing(orc)
         graph.add_ricci_curvature(hyperedge_id, normalized_orc)
     if verbose: clock_time('finished worker now sending over')
@@ -346,6 +343,9 @@ if __name__ == "__main__":
       directed_flag = 'False'
   directed_flag = eval(directed_flag) 
   if approx_emd: gurobi_flag = False
+  if approx_emd and directed_flag:
+    print('Approx EMD not implemented for Directed graphs.')
+    quit()
   
   start = time.time()
   

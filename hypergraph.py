@@ -9,6 +9,7 @@ from typing import *
 import pandas as pd
 from abc import ABC, abstractmethod
 from itertools import combinations
+import ot
 
 class Hypergraph(ABC):
     '''This is the main class we use for they hypergraph object that stores 
@@ -203,17 +204,18 @@ class Hypergraph(ABC):
         
         return max_degree, min_degree, avg_degree
     
-    def earthmover_distance_distance_matrix(self, data, distance_matrix:list[list], verbose:bool) -> float:
+    def earthmover_distance_distance_matrix(self, data, distance_matrix:list[list], approx_emd:bool, gurobi_flag:bool, verbose:bool) -> float:
         '''Getting the actual EMD calculations. This is combining the work between 
         Undirected and Directed graphs into a single function
 
         :param _type_ data: _description_
         :param list[list] distance_matrix: matrix of minimal distances from the floyd_warshall function
+        :param bool approx_emd: True if wanting to calculate approx EMD flag
+        :param bool gurobi_emd: True if wanting to calculate EMD using Gurobi solver. Alternatively using pyot flag
         :param bool verbose: verbose flag
         :raises ValueError: Will throw if the total masses aren't equal. Comes up if something has gone wrong in the EMD calculation
         :return float: The actual EMD value
         '''    
-        global RND1
         # error handling
         if isinstance(self, UndirectedHypergraph):
             # check data is node A node B
@@ -223,6 +225,30 @@ class Hypergraph(ABC):
                 return None  # Return None if either node does not exist
             mu_A = self.node_probability(node_A)
             mu_B = self.node_probability(node_B)
+            if approx_emd: # Note, this will only happen if undirected.
+                weight = self.weights[hyperedge_id][-1]
+                Na = self.neighbours(node_A)
+                Nb = self.neighbours(node_B)
+                da = len(Na)
+                db = len(Nb)
+                commonNeighbors = Na.intersection(Nb)
+                mins =[]
+                maxs =[]
+                
+                for n in commonNeighbors:
+                    aEdges = self.find_hyperedges_containing_all_nodes(n,node_A)
+                    bEdges = self.find_hyperedges_containing_all_nodes(n,node_B)
+                    for na_id in aEdges:
+                        for nb_id in bEdges:
+                            naw = self.weights[na_id][-1]
+                            nbw = self.weights[nb_id][-1]
+                            mins.append(min(naw/da, nbw/db))
+                            maxs.append(max(naw/da, nbw/db)) 
+                
+                low = - min((1 - (weight/da) - (weight/db) - sum(maxs)), 0) - min((1 - (weight/da) - (weight/db) - sum(mins)), 0) + (sum(mins))
+                high = sum(mins)
+                orc = (low + high)/2
+                return 1-orc
         elif isinstance(self, DirectedHypergraph):
             # check data is a hyperedge_id
             hyperedge_id = data 
@@ -230,32 +256,6 @@ class Hypergraph(ABC):
                 print(f"Edge {hyperedge_id} does not exist in the Directed hypergraph.")
                 return None  # Return None if edge does not exist
             mu_A, mu_B = self.calculate_probability_distributions(hyperedge_id)
-        
-        #TODO: check if this works for directed
-        if approx_emd:
-            weight = self.weights[hyperedge_id][-1]
-            Na = self.neighbours(node_A)
-            Nb = self.neighbours(node_B)
-            da = len(Na)
-            db = len(Nb)
-            commonNeighbors = Na.intersection(Nb)
-            mins =[]
-            maxs =[]
-            
-            for n in commonNeighbors:
-                aEdges = self.find_hyperedges_containing_all_nodes(n,node_A)
-                bEdges = self.find_hyperedges_containing_all_nodes(n,node_B)
-                for na_id in aEdges:
-                    for nb_id in bEdges:
-                        naw = self.weights[na_id][-1]
-                        nbw = self.weights[nb_id][-1]
-                        mins.append(min(naw/da, nbw/db))
-                        maxs.append(max(naw/da, nbw/db)) 
-            
-            low = - min((1 - (weight/da) - (weight/db) - sum(maxs)), 0) - min((1 - (weight/da) - (weight/db) - sum(mins)), 0) + (sum(mins))
-            high = sum(mins)
-            orc = (low + high)/2
-            return 1-orc
         
         # Convert distributions from dictionary to list format and print for debugging
         distribution1 = [mu_A[node] for node in self.node_index]
@@ -275,9 +275,6 @@ class Hypergraph(ABC):
         
         if abs(total_mass_A - total_mass_B) > 1e-6:
             raise ValueError('The total mass of the distributions mu_A and mu_B are not equal.')
-
-        if RND1 and verbose:
-            clock_time('starting one job')
         
         if gurobi_flag: 
             return self.earthmover_distance_gurobi_distance_matrix((mu_A, mu_B), distance_matrix, verbose)
@@ -290,15 +287,11 @@ class Hypergraph(ABC):
         '''This is now the section that is just gurobi-specific
 
         '''
-        global RND1
         
         mu_A, mu_B = data
             
         # Convert distributions from dictionary to list format and print for debugging
         node_to_index = self.node_index
-
-        if RND1 and verbose:
-            clock_time('starting one job')
         
         env = Env(empty=True)
         env.setParam("OutputFlag",0)
@@ -336,9 +329,6 @@ class Hypergraph(ABC):
             # print('bang')
             # Start the timer, solve the model, and calculate the time taken.
             model.optimize()
-            if RND1 and verbose:
-                clock_time('finished the model')
-                RND1 = False
             # print('done with the model')
             
             # Check the model status and process the results.
@@ -472,11 +462,13 @@ class UndirectedHypergraph(Hypergraph):
         return sum(node in hyperedge for hyperedge in self.hyperedges.values())
     
     
-    def earthmover_distance_hyperedge_combinations(self, hyperedge_id:str, distance_matrix:list[list], verbose:bool) -> float:
+    def earthmover_distance_hyperedge_combinations(self, hyperedge_id:str, distance_matrix:list[list], approx_emd:bool, gurobi_flag:bool, verbose:bool) -> float:
         '''This buddy gets the average EMD across the whole edge
 
         :param str hyperedge_id: The identifier for the hyperedge
         :param list[list] distance_matrix: matrix of minimal distances from the floyd_warshall function
+        :param bool approx_emd: flag to be passed to the emd calculation
+        :param bool gurobi_emd: flag to be passed to the emd calculation
         :param bool verbose: verbose flag
         :return float:  The average EMD for all permutations of node pairs, or None if the hyperedge does not exist or has errors.
         '''       
@@ -493,7 +485,7 @@ class UndirectedHypergraph(Hypergraph):
         pair_count = 0
         # Generate all combinations of pairs of nodes
         for node_A, node_B in combinations(nodes, 2):
-            emd = self.earthmover_distance_distance_matrix((node_A, node_B, hyperedge_id), distance_matrix, verbose=False)
+            emd = self.earthmover_distance_distance_matrix((node_A, node_B, hyperedge_id), distance_matrix, approx_emd, gurobi_flag, verbose=False)
             
             if emd is not None:
                 sum_emd += emd
@@ -516,6 +508,78 @@ class UndirectedHypergraph(Hypergraph):
             print(f"No valid EMD computations were possible. For hyperedge {hyperedge_id} with EMD {emd}")
             return None
         
+    def find_hyperedges_containing_all_nodes(self, *nodes) -> list:
+        '''Find hyperedges that contain all of the specified nodes. This is used in approx emd calc
+
+        :return list: list of hyperedges that contain all the specified nodes
+        '''     
+        nodes_set = set(nodes)  # Convert list to set for efficient intersection checks
+
+        # Handle different types of inputs
+        for node in nodes:
+            if isinstance(node, (list, set, tuple)):  # If the input is any kind of collection
+                nodes_set.update(node)  # Add all elements to the set
+            else:
+                nodes_set.add(node)  # Add the single element to the set
+
+        found_hyperedges = []
+        # Ensure all nodes in the set are in our nodes list
+        if not nodes_set.issubset(self.nodes):
+            print("Some nodes are not in the hypergraph.")
+        
+        # Iterate through all hyperedges
+        for hyperedge_id, hyperedge_nodes in self.hyperedges.items():
+            if nodes_set.issubset(nodes_set.intersection(hyperedge_nodes)):  # Check if intersection contains all nodes we want
+                found_hyperedges.append(hyperedge_id)
+        
+        return found_hyperedges
+        
+    def find_hyperedges_containing_nodes(self, *nodes) -> list:
+        '''Find hyperedges that contain any of the specified nodes.
+        
+        :return list: list of hyperedges that contain any the specified nodes
+
+        '''    
+        nodes_set = set(nodes)  # Convert list to set for efficient intersection checks
+
+        # Handle different types of inputs
+        for node in nodes:
+            if isinstance(node, (list, set, tuple)):  # If the input is any kind of collection
+                nodes_set.update(node)  # Add all elements to the set
+            else:
+                nodes_set.add(node)  # Add the single element to the set
+
+        found_hyperedges = []
+        # Ensure all nodes in the set are in our nodes list
+        if not nodes_set.issubset(self.nodes):
+            print("Some nodes are not in the hypergraph.")
+        
+        # Iterate through all hyperedges
+        for hyperedge_id, hyperedge_nodes in self.hyperedges.items():
+            if nodes_set.intersection(hyperedge_nodes):  # Check if intersection is not empty
+                found_hyperedges.append(hyperedge_id)
+        
+        return found_hyperedges
+    
+    def neighbours(self, node) -> set:
+        """
+        Find all nodes that share at least one hyperedge with the specified node.
+
+        :param node: The node for which to find neighbors.
+        :return: A set of neighboring nodes.
+        """
+        if node not in self.nodes:
+            return set()  # Return an empty set if the node does not exist
+
+        neighbours = set()
+        # Iterate through all hyperedges
+        for hyperedge in self.hyperedges.values():
+            if node in hyperedge:
+                neighbours.update(hyperedge)  # Add all nodes in the hyperedge
+
+        neighbours.discard(node)  # Remove the node itself from the set of neighbours
+        return neighbours
+    
     def node_probability(self, node:any) -> dict:
         '''Calculate the probability distributions of a specific node. This will
         calculate 1/deg(u) spread out around the neighbors. But it's also a lazy 
@@ -575,7 +639,6 @@ class UndirectedHypergraph(Hypergraph):
         return probability_distribution
     
             
-    
 class DirectedHypergraph(Hypergraph):
     def build_from_dataframe(self, df:pd.DataFrame, verbose=False) -> None:
         '''Build hypergraph from a DataFrame
@@ -681,3 +744,65 @@ class DirectedHypergraph(Hypergraph):
                 d_out_x += 1  
         
         return [d_in_x, d_out_x]
+    
+    def calculate_probability_distributions(self, hyperedge_id:str):
+        '''Function to calculate the probability distributions over all nodes based on the hyperedge
+
+        :param str hyperedge_id: Name of the edge we're working with
+        :return dict, dict: muA in and muB out
+        '''    
+        tail_set, head_set = self.hyperedges[hyperedge_id]
+
+        # Initialize mu_A and mu_B only for nodes in the tail set and head set respectively
+       
+        mu_A_in = {node: 0 for node in self.nodes}
+        for node in tail_set:
+            d_x_in = self.node_degree(node)[0]
+            if d_x_in != 0:
+                mu_A_in[node] = 0
+            else:
+                mu_A_in[node] = 1 / len(tail_set)
+       
+        mu_B_out = {node: 0 for node in self.nodes}
+        for node in head_set:
+            d_x_out = self.node_degree(node)[1]
+            if d_x_out != 0:
+                mu_B_out[node] = 0
+            else:
+                mu_B_out[node] = 1 / len(head_set)
+        
+        # Third Case
+        for edge in self.hyperedges:
+            if edge != hyperedge_id:
+                tail_set_prime, head_set_prime = self.hyperedges[edge]
+                common_tail_nodes = set(tail_set) & set(head_set_prime)
+                if common_tail_nodes:
+                    for node in common_tail_nodes:
+                        deg_x_in = self.node_degree(node)[0]
+                        for nodes in tail_set_prime:
+                            if deg_x_in != 0:  
+                                mu_A_in[nodes] += 1 / (len(tail_set) * len(tail_set_prime) * deg_x_in)
+
+                common_head_nodes = set(head_set) & set(tail_set_prime)
+                if common_head_nodes:
+                    for node in common_head_nodes:
+                        deg_x_out = self.node_degree(node)[1]
+                        for nodes in head_set_prime:
+                            if deg_x_out != 0:    
+                                mu_B_out[nodes] += 1 / (len(head_set) * len(head_set_prime) * deg_x_out)
+              
+        total_mass_A = sum(mu_A_in.values())
+        total_mass_B = sum(mu_B_out.values())
+        
+        # Normalize the probability distributions
+        if total_mass_A == 0:
+            mu_A_in ={node: mass for node, mass in mu_A_in.items()}
+        else:
+            mu_A_in = {node: mass / total_mass_A for node, mass in mu_A_in.items()}
+        
+        if total_mass_B == 0:
+            mu_B_out = {node: mass for node, mass in mu_B_out.items()}
+        else:
+            mu_B_out = {node: mass / total_mass_B for node, mass in mu_B_out.items()}
+        
+        return mu_A_in, mu_B_out
