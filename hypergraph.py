@@ -276,79 +276,80 @@ class Hypergraph(ABC):
         if abs(total_mass_A - total_mass_B) > 1e-6:
             raise ValueError('The total mass of the distributions mu_A and mu_B are not equal.')
         
-        if gurobi_flag: 
-            return self.earthmover_distance_gurobi_distance_matrix((mu_A, mu_B), distance_matrix, verbose)
+        #TODO: implement the gurobi_flag
+        # if gurobi_flag: 
+        #     return self.earthmover_distance_gurobi_distance_matrix((mu_A, mu_B), distance_matrix, verbose)
         else: # then we're in POT world
             # ensure the distribution and the distance matrix line up. This should be the case if we've done floyd warshall for this distance matrix. Which I am going to assume we do.
             W = ot.emd2(distribution1, distribution2, distance_matrix)
             return W
             
-    def earthmover_distance_gurobi_distance_matrix(self, data, distance_matrix, verbose):
-        '''This is now the section that is just gurobi-specific
+    # def earthmover_distance_gurobi_distance_matrix(self, data, distance_matrix, verbose):
+    #     '''This is now the section that is just gurobi-specific
 
-        '''
+    #     '''
         
-        mu_A, mu_B = data
+    #     mu_A, mu_B = data
             
-        # Convert distributions from dictionary to list format and print for debugging
-        node_to_index = self.node_index
+    #     # Convert distributions from dictionary to list format and print for debugging
+    #     node_to_index = self.node_index
         
-        env = Env(empty=True)
-        env.setParam("OutputFlag",0)
-        env.start()
+    #     env = Env(empty=True)
+    #     env.setParam("OutputFlag",0)
+    #     env.start()
         
-        try:
-            # Create a new model in Gurobi.
-            model = Model("EarthMoverDistance", env=env)
+    #     try:
+    #         # Create a new model in Gurobi.
+    #         model = Model("EarthMoverDistance", env=env)
             
-            # # Make it less verbose
-            # model.Params.LogToConsole = 0   
+    #         # # Make it less verbose
+    #         # model.Params.LogToConsole = 0   
             
-            # Set up the log file
-            # log_filename = f"gurobi_log_{data}.log"
-            # model.setParam('LogFile', log_filename)
+    #         # Set up the log file
+    #         # log_filename = f"gurobi_log_{data}.log"
+    #         # model.setParam('LogFile', log_filename)
             
-            # Create variables for the linear program.
-            variables = model.addVars(mu_A.keys(), mu_B.keys(), name="z", lb=0) 
-            # print('boom')
-            expr = LinExpr(3.0)
-            expr.clear()
-            for x in mu_A:
-                for y in mu_B:
-                    expr.addTerms(distance_matrix[node_to_index[x]][node_to_index[y]], variables[x,y])
+    #         # Create variables for the linear program.
+    #         variables = model.addVars(mu_A.keys(), mu_B.keys(), name="z", lb=0) 
+    #         # print('boom')
+    #         expr = LinExpr(3.0)
+    #         expr.clear()
+    #         for x in mu_A:
+    #             for y in mu_B:
+    #                 expr.addTerms(distance_matrix[node_to_index[x]][node_to_index[y]], variables[x,y])
             
-            # Set the objective of the linear program to minimize the total cost.
-            model.setObjective(expr, GRB.MINIMIZE)
+    #         # Set the objective of the linear program to minimize the total cost.
+    #         model.setObjective(expr, GRB.MINIMIZE)
             
-            # Add constraints to ensure the conservation of mass.
-            for x in mu_A:
-                model.addConstr(quicksum(variables[x, y] for y in mu_B) == mu_A[x], f"dirt_leaving_{x}")
+    #         # Add constraints to ensure the conservation of mass.
+    #         for x in mu_A:
+    #             model.addConstr(quicksum(variables[x, y] for y in mu_B) == mu_A[x], f"dirt_leaving_{x}")
 
-            for y in mu_B:
-                model.addConstr(quicksum(variables[x, y] for x in mu_A) == mu_B[y], f"dirt_filling_{y}")
-            # print('bang')
-            # Start the timer, solve the model, and calculate the time taken.
-            model.optimize()
-            # print('done with the model')
+    #         for y in mu_B:
+    #             model.addConstr(quicksum(variables[x, y] for x in mu_A) == mu_B[y], f"dirt_filling_{y}")
+    #         # print('bang')
+    #         # Start the timer, solve the model, and calculate the time taken.
+    #         model.optimize()
+    #         # print('done with the model')
             
-            # Check the model status and process the results.
-            if model.status == GRB.OPTIMAL:
-                total_cost = model.getObjective().getValue()
-                model.dispose()
-                env.dispose()
-                return total_cost
-            else:
-                print(f"No optimal solution found for data {data}")
-                print(f"The probability distributions are A: {mu_A} \nAnd B: {mu_B}")
-                print('Model Status', model.status)
-                # print(f"The masses are {total_mass_A} for A and {total_mass_B} for B")
-                model.dispose()
-                env.dispose()
-                return None
+    #         # Check the model status and process the results.
+    #         if model.status == GRB.OPTIMAL:
+    #             total_cost = model.getObjective().getValue()
+    #             model.dispose()
+    #             env.dispose()
+    #             return total_cost
+    #         else:
+    #             print(f"No optimal solution found for data {data}")
+    #             print(f"The probability distributions are A: {mu_A} \nAnd B: {mu_B}")
+    #             print('Model Status', model.status)
+    #             # print(f"The masses are {total_mass_A} for A and {total_mass_B} for B")
+    #             model.dispose()
+    #             env.dispose()
+    #             return None
             
-        except Exception as e:
-            print(f"Gurobi Error: {e}\n for data {data}")
-            return None 
+    #     except Exception as e:
+    #         print(f"Gurobi Error: {e}\n for data {data}")
+    #         return None 
         
     # These are implemented in the subclasses
     @abstractmethod
