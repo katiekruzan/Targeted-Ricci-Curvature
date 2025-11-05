@@ -3,3 +3,4 @@ inputfiles/
 outputfiles/
 nohup.out
 __pycache__/
+docs/_build/
