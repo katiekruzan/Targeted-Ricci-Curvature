@@ -213,10 +213,10 @@ def manager(npr:int, verbose=False):
     '''    
     clean_output(verbose)
 
-    # source_filename = os.environ.get('SOURCE_FILENAME')
-    # target_filename = os.environ.get('TARGET_FILENAME')
-    source_filename = "petersen/petersengraph.csv"
-    target_filename = "petersen/petersengraphExtraEdge.csv"
+    source_filename = os.environ.get('SOURCE_FILENAME')
+    target_filename = os.environ.get('TARGET_FILENAME')
+    # source_filename = "petersen/petersengraph.csv"
+    # target_filename = "petersen/petersengraphExtraEdge.csv"
 
     path1 = "inputfiles/" + source_filename
     path2 = "inputfiles/" + target_filename
@@ -287,16 +287,11 @@ def worker(w:int, verbose=False):
 
 if __name__ == "__main__":
     """
-    We're going to run this for 40 itterations. As I don't think this is the same 
+    We're going to run this for a set number of itterations. As I don't think this is the same 
     sense of convergence as we want. Looking at the paper.
     """
-    # TODO: Deal with this thought:
-    """
-    The curvature is scale agnostic. But that doesn't make it stay stable necessarily
-    For the petersen graph, it should be the same. But it moves around.
-    Is that an us problem? Is that something else we've got going?
-    """
-    ITTS = 5
+    
+    ITTS = 10
     start = time.time()
     set_start(start)
 
