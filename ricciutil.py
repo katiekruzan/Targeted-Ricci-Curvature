@@ -1,3 +1,7 @@
+'''The utility functions that are used by all the other ricci flow experiments. 
+This will be used as a module.
+
+'''
 import os
 import time
 import pandas as pd
