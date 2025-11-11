@@ -112,7 +112,7 @@ class Hypergraph(ABC):
         dfs(start_node)
         return visited == self.nodes   
     
-    def connected_components(self) -> dict:
+    def connected_components(self) -> list[set]:
         '''Taken from the implementation of DirectedHypergraph.py on 
         Prith's Ricci-Flow-on-Hypergraphs
 
@@ -130,20 +130,22 @@ class Hypergraph(ABC):
         def dfs(node, component):
             '''Depth First Search'''
             if node in visited:
-                return component
+                return 
             visited.add(node)
             component.add(node)
             for edge in edges.values():
                 if node in edge:
                     for next_node in edge:
                         if next_node != node:
-                            return dfs(next_node, component)
+                            dfs(next_node, component)
         
         ind = 1
         for node in self.nodes:
             if node not in visited:
                 # make a new component
-                current_component = dfs(node, set())
+                current_component = set()
+                dfs(node, current_component)
+                print(current_component)
                 for node in current_component:
                     components[node] = ind
                 ind = ind+1 
