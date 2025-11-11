@@ -20,11 +20,7 @@ def update_orc_and_weights_iter_manager(
     :param bool verbose: verbose flag, defaults to False
     '''    
     file_name = f"outputfiles/dataset_untargeted_curvature_{graphname}_iteration_{iteration}.csv"
-    # max_dist = max([dist for node_dists in dist_matrix.values() for dist in node_dists.values() if dist < float('inf')])
-    # NOTE: for right now am going to make this 1
     updated_weights = {}
-    # totweight = hypergraph.get_total_weight()
-    totweight = 1.0
 
     with open(file_name, "a", newline="") as file:
         writer = csv.writer(file)
@@ -37,7 +33,6 @@ def update_orc_and_weights_iter_manager(
         chunksize = njobs // (npr - 1)
         remainder = njobs % (npr - 1)
         jobcnt = 0
-        # verbose=True
         while jobcnt < npr - 1:
             # send the jobs
             for i in range(1, npr):
@@ -70,19 +65,12 @@ def update_orc_and_weights_iter_manager(
                         "number of jobs",
                         len(jobs),
                     )
-                # print(newgraph.ricci_curvature)
-                # print('updated weights')
-                # print(updated_weightspt)
+                    
                 updated_weights.update(updated_weightspt)
                 for e in jobs:  # sync up the graph
                     hypergraph.add_ricci_curvature(e, newgraph.ricci_curvature[e][-1])
-            # print('totalupdatedweights')
-            # print(updated_weights)
+
             for hyperedge_id, new_weight in updated_weights.items():
-                # Will also normalize the weights
-                # newtotwt = sum([value[-1] for _, value in updated_weights.items()])
-                # normfactor = totweight / newtotwt
-                # normalized_wt = normfactor * new_weight
                 normalized_wt = new_weight
                 writer.writerow(
                     [
@@ -94,7 +82,15 @@ def update_orc_and_weights_iter_manager(
                 hypergraph.add_weights(hyperedge_id, normalized_wt)
     return
 
-def one_direction_of_work_manager(npr, source_file, graphname, verbose=False):
+def one_direction_of_work_manager(npr:int, source_file:str, graphname:str, verbose=False):
+    '''_summary_
+
+    :param int npr: the number of processors
+    :param str source_file: filepath name to where the source graph lies. Should be a csv
+    :param str graphname: This name is used in the filename to persist info about the graph
+    :param bool verbose: verbose flag, defaults to False
+    :return _type_: _description_
+    '''    
     if directed_flag:
         source_graph = DirectedHypergraph()
     else:
@@ -241,7 +237,12 @@ def build_distance_vectors(dist_dict, nodes_order, node_index):
     return np.array(vectors)
 
 
-def manager(npr, verbose=False):
+def manager(npr:int, verbose=False):
+    '''This is the main function for the manager node
+
+    :param int npr: number of worker nodes we're working with
+    :param bool verbose: verbose flag, defaults to False
+    '''    
     clean_output(verbose)
 
     # source_filename = os.environ.get('SOURCE_FILENAME')
@@ -309,7 +310,12 @@ def manager(npr, verbose=False):
     return
 
 
-def worker(w, verbose=False):
+def worker(w:int, verbose=False):
+    '''This is the main function for the worker node
+
+    :param int w: The rank of the specific worker node we're using. Used primarily in pulling the information
+    :param bool verbose: verbose flag, defaults to False
+    '''    
     one_direction_of_work_worker(w, tot_its= ITTS)
     one_direction_of_work_worker(w, tot_its = ITTS)
     while True:
