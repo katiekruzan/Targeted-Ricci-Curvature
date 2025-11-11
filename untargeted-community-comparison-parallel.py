@@ -111,21 +111,7 @@ def update_orc_and_weights_iter_manager(
     return
 
 
-def one_direction_of_work_manager(npr, source_file, graphname):
-    if directed_flag:
-        source_graph = DirectedHypergraph()
-    else:
-        source_graph = UndirectedHypergraph()
-
-    print("building the graph")
-
-    df = pd.read_csv(source_file)
-    source_graph.build_from_dataframe(df, verbose)
-    
-    write_scorecard(f"Type of graph: {type(source_graph)}")
-    write_scorecard(f"Number of edges: {len(source_graph.hyperedges)}")
-    write_scorecard(f"Number of nodes: {len(source_graph.nodes)}")
-    
+def one_direction_of_work_manager(npr:int, source_graph:Hypergraph, graphname:str):
     
     for i in range(ITTS):
         print("Starting itteration ", i)
@@ -138,12 +124,52 @@ def one_direction_of_work_manager(npr, source_file, graphname):
         )
         clock_time(f"Time for ORC {i}")
         
-        if i%2 ==0: # then we become surgeons
-            print('time for surgery')
-            delete_hyperedges(source_graph, percentage=0.08)
+        # convergence check
+        allstable = True
+        if i < 2:
+            # TODO: fix this weirdness
+            # take care of the getting started case
+            continue
+        errorlist = []
+        for e in source_graph.hyperedges:
+            clist = source_graph.ricci_curvature[e]
+            old = clist[-2]
+            new = clist[-1]
+            if old != 0:
+                if absolute_change:
+                    error = abs(old - new)
+                else:
+                    error = abs((old - new) / old)  # relative change
+            else:
+                error = abs(old - new)
+                if not absolute_change:
+                    error = error / old
+            if maximum_error:
+                if absolute_change and (error > 0.01):
+                    clock_time(f"unstable for edge {e} with error {error}")
+                    allstable = False
+                    break
+                if (not absolute_change) and (error > 0.05):  # relative change
+                    clock_time(f"unstable for edge {e} with error {error}")
+                    allstable = False
+                    break
+            else:
+                errorlist.append(error)
+        # find the average error
+        if not maximum_error:  # AKA we're in average error zone
+            # assumed to be in absolute error zone
+            avg_err = np.average(errorlist)
+            if avg_err > 0.0001:
+                clock_time(f"unstable with average error {avg_err}")
+                allstable = False
+        if allstable:
+            # turn off all workers.
+            for k in range(1, npr):
+                COMM.send(-1, dest=k, tag=333)
+            print("STABILIZED! Source to target distance is ", i)
+            break
     
-    communities = write_hypergraph_stats(source_graph)
-    return communities
+    return source_graph
 
 # Worker functions
 def update_orc_and_weights_iter_worker(w):
@@ -205,6 +231,23 @@ def one_direction_of_work_worker(w, tot_its = 100):
         cnt = cnt + 1
     return 
 
+
+def setup_one_direction(source_file):
+    if directed_flag:
+        source_graph = DirectedHypergraph()
+    else:
+        source_graph = UndirectedHypergraph()
+
+    print("building the graph")
+
+    df = pd.read_csv(source_file)
+    source_graph.build_from_dataframe(df, verbose)
+    
+    write_scorecard(f"Type of graph: {type(source_graph)}")
+    write_scorecard(f"Number of edges: {len(source_graph.hyperedges)}")
+    write_scorecard(f"Number of nodes: {len(source_graph.nodes)}")
+    return source_graph
+
 def manager(npr:int, verbose=False):
     '''This is the main function for the manager node
 
@@ -213,10 +256,10 @@ def manager(npr:int, verbose=False):
     '''    
     clean_output(verbose)
 
-    source_filename = os.environ.get('SOURCE_FILENAME')
-    target_filename = os.environ.get('TARGET_FILENAME')
-    # source_filename = "petersen/petersengraph.csv"
-    # target_filename = "petersen/petersengraphExtraEdge.csv"
+    # source_filename = os.environ.get('SOURCE_FILENAME')
+    # target_filename = os.environ.get('TARGET_FILENAME')
+    source_filename = "petersen/petersengraph.csv"
+    target_filename = "petersen/petersengraphExtraEdge.csv"
 
     path1 = "inputfiles/" + source_filename
     path2 = "inputfiles/" + target_filename
@@ -244,23 +287,36 @@ def manager(npr:int, verbose=False):
         write_scorecard("EMD Solver: Python Optimal Transport")
 
     clock_time("Time to read the data in seconds")
+    
+    # now the idea is we run ricci flow until convergence for both, then compare 
+    # communities, then delete edges, then calculate distances.
+    graph1 = setup_one_direction(path1)
+    graph2 = setup_one_direction(path2)
+    for i in range(DISTSEQ):
+        graph1 = one_direction_of_work_manager(npr, graph1, 'Graph1')
+        clock_time('Finished graph 1')
 
-    communities1 = one_direction_of_work_manager(npr, path1, 'Graph1')
-    write_scorecard('Finished the first graph\n')
-    
-    communities2 = one_direction_of_work_manager(npr, path2, 'Graph2')
-    write_scorecard('Finished the second graph')
-    
-    # Now to do the adjusted random index. We will need to label each of them.
-    labels1 = []
-    labels2 = []
-    for node in communities1.keys():
-        labels1.append(communities1[node])
-        labels2.append(communities2[node])
+        graph2 = one_direction_of_work_manager(npr, graph2, 'Graph2')
+        clock_time('Finished graph 2')
         
-    write_scorecard('\nThe final community comparisons')
-    write_scorecard(f'Rand Score: {rand_score(labels1, labels2)}')
-    write_scorecard(f'Adjusted Rand Score: {adjusted_rand_score(labels1, labels2)}')
+        write_scorecard('\n--Stats for graph 1--')
+        delete_hyperedges(graph1, percentage=0.08)
+        communities1 = write_hypergraph_stats(graph1)
+        write_scorecard('--Stats for graph 2--')
+        delete_hyperedges(graph2, percentage=0.08)
+        communities2 = write_hypergraph_stats(graph2)
+        
+        # Now to do the adjusted random index. We will need to label each of them.
+        labels1 = []
+        labels2 = []
+        for node in communities1.keys():
+            labels1.append(communities1[node])
+            labels2.append(communities2[node])
+        
+        write_scorecard(f'\n*Stage {i} final community comparisons')
+        write_scorecard('----------------------------------------')
+        write_scorecard(f'Rand Score: {rand_score(labels1, labels2)}')
+        write_scorecard(f'Adjusted Rand Score: {adjusted_rand_score(labels1, labels2)}\n')
     
     # tell the jobs to sleep (at the very end)
     # send the jobs
@@ -272,8 +328,10 @@ def manager(npr:int, verbose=False):
     return
 
 def worker(w:int, verbose=False):
-    one_direction_of_work_worker(w, tot_its=ITTS)
-    one_direction_of_work_worker(w, tot_its=ITTS)
+    for i in range(DISTSEQ):
+        print(f'worker round {i}')
+        one_direction_of_work_worker(w, tot_its=ITTS)
+        one_direction_of_work_worker(w, tot_its=ITTS)
     # Turn off the workers
     print('worker is workin')
     while True:
@@ -290,8 +348,10 @@ if __name__ == "__main__":
     We're going to run this for a set number of itterations. As I don't think this is the same 
     sense of convergence as we want. Looking at the paper.
     """
+    #TODO: persist the final matrix for the curvature and then persist community dictionaries
     
-    ITTS = 10
+    ITTS = 40
+    DISTSEQ = 5
     start = time.time()
     set_start(start)
 
