@@ -112,6 +112,44 @@ class Hypergraph(ABC):
         dfs(start_node)
         return visited == self.nodes   
     
+    def connected_components(self) -> dict:
+        '''Taken from the implementation of DirectedHypergraph.py on 
+        Prith's Ricci-Flow-on-Hypergraphs
+
+        :return dict: A dictionary of the nodes to some arbitrary label for 
+        what community it belongs to
+        '''        
+        # empty graph has no components
+        if not self.nodes: 
+            return []
+        
+        visited = set()
+        components = {}
+        edges = self.get_underlying_edges()
+        
+        def dfs(node, component):
+            '''Depth First Search'''
+            if node in visited:
+                return component
+            visited.add(node)
+            component.add(node)
+            for edge in edges.values():
+                if node in edge:
+                    for next_node in edge:
+                        if next_node != node:
+                            return dfs(next_node, component)
+        
+        ind = 1
+        for node in self.nodes:
+            if node not in visited:
+                # make a new component
+                current_component = dfs(node, set())
+                for node in current_component:
+                    components[node] = ind
+                ind = ind+1 
+        
+        return components
+                 
     def floyd_warshall(self) -> list[list]:
         '''Use the Floyd-Warshall algorithm to find the shortest distances between
            each pair of vertices. Right now, if you cannot get from one node to 
