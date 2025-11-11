@@ -2,7 +2,8 @@ from hypergraph import *
 from ricciutil import *
 from mpi4py import MPI
 import csv
-from heapq import nlargest
+from sklearn.metrics import rand_score, adjusted_rand_score
+
 
 COMM = MPI.COMM_WORLD
 
@@ -21,18 +22,16 @@ def delete_hyperedges(hypergraph:Hypergraph, percentage=0.08):
         hypergraph.remove_hyperedge(he)
     
 
-def write_hypergraph_stats(hypergraph:Hypergraph, iteration):
-    write_scorecard(f"Number of hyperedges: {len(hypergraph.hyperedges)}\n")
-    write_scorecard(f"Number of nodes: {len(hypergraph.nodes)}\n")
+def write_hypergraph_stats(hypergraph:Hypergraph):
+    write_scorecard(f"Number of hyperedges: {len(hypergraph.hyperedges)}")
+    write_scorecard(f"Number of nodes: {len(hypergraph.nodes)}")
     connected = hypergraph.is_weakly_connected()
-    write_scorecard("The hypergraph is weakly connected:\n" if connected else "The hypergraph is not weakly connected.\n")
+    write_scorecard("The hypergraph is weakly connected:" if connected else "The hypergraph is not weakly connected.")
     components = hypergraph.connected_components()
-    write_scorecard(f"Connected Components: {components}\n")
-    write_scorecard(f"No. of modules: {len(components)}\n")
+    write_scorecard(f"Connected Components: {components}")
+    write_scorecard(f"No. of modules: {len(set(components.values()))}")
     # # Listing all hyperedges
-    write_scorecard("\nList of all hyperedges:\n")
-    for hyperedge_id, edge_data in hypergraph.hyperedges.items():
-        write_scorecard(f"Hyperedge ID: {hyperedge_id}, Hyperedge: {edge_data}\n")
+    return components
             
 
 # Manager Functions
@@ -142,7 +141,9 @@ def one_direction_of_work_manager(npr, source_file, graphname):
         if i%2 ==0: # then we become surgeons
             print('time for surgery')
             delete_hyperedges(source_graph, percentage=0.08)
-    return
+    
+    communities = write_hypergraph_stats(source_graph)
+    return communities
 
 # Worker functions
 def update_orc_and_weights_iter_worker(w):
@@ -199,7 +200,7 @@ def one_direction_of_work_worker(w, tot_its = 100):
     update_orc_and_weights_iter_worker(w) 
     cont=True
     cnt = 1
-    while cont and (cnt<=tot_its):
+    while cont and (cnt<tot_its):
         cont = update_orc_and_weights_iter_worker(w)
         cnt = cnt + 1
     return 
@@ -244,7 +245,23 @@ def manager(npr:int, verbose=False):
 
     clock_time("Time to read the data in seconds")
 
-    one_direction_of_work_manager(npr, path1, 'Graph1')
+    communities1 = one_direction_of_work_manager(npr, path1, 'Graph1')
+    write_scorecard('Finished the first graph\n')
+    
+    communities2 = one_direction_of_work_manager(npr, path2, 'Graph2')
+    write_scorecard('Finished the second graph')
+    
+    # Now to do the adjusted random index. We will need to label each of them.
+    labels1 = []
+    labels2 = []
+    for node in communities1.keys():
+        labels1.append(communities1[node])
+        labels2.append(communities2[node])
+        
+    write_scorecard('\nThe final community comparisons')
+    write_scorecard(f'Rand Score: {rand_score(labels1, labels2)}')
+    write_scorecard(f'Adjusted Rand Score: {adjusted_rand_score(labels1, labels2)}')
+    
     # tell the jobs to sleep (at the very end)
     # send the jobs
     for i in range(1, npr):
@@ -256,7 +273,15 @@ def manager(npr:int, verbose=False):
 
 def worker(w:int, verbose=False):
     one_direction_of_work_worker(w, tot_its=ITTS)
+    one_direction_of_work_worker(w, tot_its=ITTS)
+    # Turn off the workers
     print('worker is workin')
+    while True:
+        specs = COMM.recv(source = 0, tag = 55)
+        if specs == -33: 
+            if verbose:
+                print(f'Worker {w} goes to sleep')
+            break
     return
 
 
@@ -271,7 +296,7 @@ if __name__ == "__main__":
     For the petersen graph, it should be the same. But it moves around.
     Is that an us problem? Is that something else we've got going?
     """
-    ITTS = 40
+    ITTS = 5
     start = time.time()
     set_start(start)
 
