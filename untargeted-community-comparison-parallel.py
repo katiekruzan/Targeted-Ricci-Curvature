@@ -216,7 +216,7 @@ def update_orc_and_weights_iter_worker(w):
             else:
                 wtplus1 = weight
             #TODO: see if this makes sense to track updated weights separately
-            updated_weights[hyperedge_id] = max(wtplus1, 1e-8)
+            updated_weights[hyperedge_id] = wtplus1
         else:
             updated_weights[hyperedge_id] = weight
     if verbose:
@@ -260,10 +260,10 @@ def manager(npr:int, verbose=False):
     '''    
     clean_output(verbose)
 
-    # source_filename = os.environ.get('SOURCE_FILENAME')
-    # target_filename = os.environ.get('TARGET_FILENAME')
-    source_filename = "petersen/petersengraph.csv"
-    target_filename = "petersen/petersengraphExtraEdge.csv"
+    source_filename = os.environ.get('SOURCE_FILENAME')
+    target_filename = os.environ.get('TARGET_FILENAME')
+    # source_filename = "petersen/petersengraph.csv"
+    # target_filename = "petersen/petersengraphExtraEdge.csv"
 
     path1 = "inputfiles/" + source_filename
     path2 = "inputfiles/" + target_filename
@@ -297,6 +297,7 @@ def manager(npr:int, verbose=False):
     graph1 = setup_one_direction(path1)
     graph2 = setup_one_direction(path2)
     for i in range(DISTSEQ):
+        print(f'--Begining Stage {i}')
         graph1 = one_direction_of_work_manager(npr, graph1, 'Graph1')
         clock_time('Finished graph 1')
 
@@ -337,11 +338,9 @@ def manager(npr:int, verbose=False):
 
 def worker(w:int, verbose=False):
     for i in range(DISTSEQ):
-        print(f'worker round {i}')
         one_direction_of_work_worker(w, tot_its=ITTS)
         one_direction_of_work_worker(w, tot_its=ITTS)
     # Turn off the workers
-    print('worker is workin')
     while True:
         specs = COMM.recv(source = 0, tag = 55)
         if specs == -33: 
@@ -357,8 +356,8 @@ if __name__ == "__main__":
     sense of convergence as we want. Looking at the paper.
     """
     
-    ITTS = 40
-    DISTSEQ = 5
+    ITTS = 100
+    DISTSEQ = 40
     start = time.time()
     set_start(start)
 

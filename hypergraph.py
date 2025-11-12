@@ -148,7 +148,6 @@ class Hypergraph(ABC):
                 # make a new component
                 current_component = set()
                 dfs(node, current_component)
-                print(current_component)
                 for node in current_component:
                     components[node] = ind
                 ind = ind+1
