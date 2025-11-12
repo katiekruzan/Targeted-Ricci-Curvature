@@ -38,7 +38,8 @@ def write_hypergraph_stats(hypergraph:Hypergraph):
 def update_orc_and_weights_iter_manager(
     npr:int, hypergraph: Hypergraph, dist_matrix:list[list], iteration:int, graphname:str, verbose=False
 ):
-    '''The main function of this whole sheboodle. Run the whole process for the given itteration
+    '''The main function of this whole sheboodle. Run the whole process for the given itteration.
+    Note in this one, we will not be persisting this. Will trust that this is correct
 
     :param int npr: the number of processors
     :param Hypergraph hypergraph: the graph we're looking at
@@ -49,6 +50,8 @@ def update_orc_and_weights_iter_manager(
     '''    
     file_name = f"outputfiles/dataset_untargeted_curvature_{graphname}_iteration_{iteration}.csv"
     updated_weights = {}
+    # delete previous itteration
+    
 
     with open(file_name, "a", newline="") as file:
         writer = csv.writer(file)
@@ -116,7 +119,6 @@ def one_direction_of_work_manager(npr:int, source_graph:Hypergraph, graphname:st
     for i in range(ITTS):
         print("Starting itteration ", i)
 
-        # TODO: persist the most recent distance matrix
         dist_matrix = source_graph.floyd_warshall()
 
         update_orc_and_weights_iter_manager(
@@ -167,6 +169,8 @@ def one_direction_of_work_manager(npr:int, source_graph:Hypergraph, graphname:st
             for k in range(1, npr):
                 COMM.send(-1, dest=k, tag=333)
             print("STABILIZED! Source to target distance is ", i)
+            file_name = f"outputfiles/dataset_untargeted_curvature_{graphname}_iteration_{i}.csv"
+            os.rename(file_name, f'outputfiles/dataset_untargeted_final_curvature_{graphname}.csv')
             break
     
     return source_graph
@@ -302,9 +306,13 @@ def manager(npr:int, verbose=False):
         write_scorecard('\n--Stats for graph 1--')
         delete_hyperedges(graph1, percentage=0.08)
         communities1 = write_hypergraph_stats(graph1)
+        pd.DataFrame.from_dict(communities1, orient='index').to_csv(f'outputfiles/communityAssignmentGraph1Round{i}.csv')
+        os.rename('outputfiles/dataset_untargeted_final_curvature_Graph1.csv', f'outputfiles/dataset_untargeted_final_curvature_Graph1_Stage{i}.csv')
         write_scorecard('--Stats for graph 2--')
         delete_hyperedges(graph2, percentage=0.08)
         communities2 = write_hypergraph_stats(graph2)
+        pd.DataFrame.from_dict(communities2, orient='index').to_csv(f'outputfiles/communityAssignmentGraph2Round{i}.csv')
+        os.rename('outputfiles/dataset_untargeted_final_curvature_Graph2.csv', f'outputfiles/dataset_untargeted_final_curvature_Graph2_Stage{i}.csv')
         
         # Now to do the adjusted random index. We will need to label each of them.
         labels1 = []
@@ -348,7 +356,6 @@ if __name__ == "__main__":
     We're going to run this for a set number of itterations. As I don't think this is the same 
     sense of convergence as we want. Looking at the paper.
     """
-    #TODO: persist the final matrix for the curvature and then persist community dictionaries
     
     ITTS = 40
     DISTSEQ = 5
