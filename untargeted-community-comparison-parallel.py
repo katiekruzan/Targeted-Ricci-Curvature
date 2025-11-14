@@ -244,7 +244,7 @@ def setup_one_direction(source_file):
 
     print("building the graph")
 
-    df = pd.read_csv(source_file)
+    df = pd.read_csv(source_file, dtype={'source': str, 'target':str})
     source_graph.build_from_dataframe(df, verbose)
     
     write_scorecard(f"Type of graph: {type(source_graph)}")
