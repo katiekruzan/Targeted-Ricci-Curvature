@@ -151,7 +151,6 @@ def calculate_target_orc_manager(
     with open(file_name, "a", newline="") as file:
         writer = csv.writer(file)
         # Check if the file is empty to write headers
-        # TODO: maybe fix the top writing?
         if file.tell() == 0:
             writer.writerow(["Hyperedge ID", "ORC", "Weight"])
 
