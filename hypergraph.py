@@ -433,8 +433,8 @@ class UndirectedHypergraph(Hypergraph):
         '''
         # make an edge from each row in the csv
         for _, row in df.iterrows():
-            node1 = row['source'].astype(str).strip()  # start
-            node2 = row['target'].astype(str).strip()  # end
+            node1 = row['source'].strip()  # start
+            node2 = row['target'].strip()  # end
             weight = float(row['weight'])
             edgeid = node1 + '_to_' + node2
             self.add_hyperedge(edgeid, [node1, node2], [weight], verbose)
