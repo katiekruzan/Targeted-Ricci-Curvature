@@ -73,7 +73,7 @@ def set_up_one_direction(src_graph: Hypergraph, targ_graph: Hypergraph, op_flag=
     :param Hypergraph src_graph: The source graph
     :param Hypergraph targ_graph: The target graph
     :param bool op_flag: used to indicated if we should add the 'op_' prefix, defaults to False
-    :return _type_: target_distance_matrix, distance_matrix, missing_from_src, missing_from_targ
+    :return : target_distance_matrix, distance_matrix, missing_from_src, missing_from_targ
     """
     print("working on distance matrices")
     distance_matrix = src_graph.floyd_warshall()
@@ -101,12 +101,15 @@ def set_up_one_direction(src_graph: Hypergraph, targ_graph: Hypergraph, op_flag=
     if set(targ_graph.hyperedges) != set(src_graph.hyperedges):
         print(set(targ_graph.hyperedges) - set(src_graph.hyperedges))
         # logging the edges that are different
-        missing_from_src = set(targ_graph.hyperedges) - set(src_graph.hyperedges)
-        missing_from_targ = set(src_graph.hyperedges) - set(targ_graph.hyperedges)
+        missing_from_src = set(targ_graph.hyperedges) - \
+            set(src_graph.hyperedges)
+        missing_from_targ = set(src_graph.hyperedges) - \
+            set(targ_graph.hyperedges)
 
         print("Taking care of missing edges")
         # add edges that are in the target but not the source
-        src_graph.add_missing_edges_shortest_path(targ_graph, distance_matrix, verbose)
+        src_graph.add_missing_edges_shortest_path(
+            targ_graph, distance_matrix, verbose)
         targ_graph.add_missing_edges_shortest_path(
             src_graph, target_distance_matrix, verbose
         )
@@ -168,10 +171,11 @@ def calculate_target_orc_manager(
                 jobstosend = []
                 if jobcnt <= remainder:
                     jobstosend = edges[
-                        (jobcnt - 1) * chunksize : jobcnt * chunksize
+                        (jobcnt - 1) * chunksize: jobcnt * chunksize
                     ] + [edges[-jobcnt]]
                 else:
-                    jobstosend = edges[(jobcnt - 1) * chunksize : jobcnt * chunksize]
+                    jobstosend = edges[(jobcnt - 1) *
+                                       chunksize: jobcnt * chunksize]
                 SLICE = (jobstosend, distance_matrix, graph, verbose)
                 COMM.send(SLICE, dest=i, tag=33)
                 if verbose:
@@ -197,10 +201,12 @@ def calculate_target_orc_manager(
                         len(jobs),
                     )
                 for e in jobs:  # sync up the graph
-                    graph.add_ricci_curvature(e, newgraph.ricci_curvature[e][-1])
+                    graph.add_ricci_curvature(
+                        e, newgraph.ricci_curvature[e][-1])
                     graph.add_weights(e, newgraph.weights[e][-1])
                     writer.writerow(
-                        [e, newgraph.ricci_curvature[e][-1], newgraph.weights[e][-1]]
+                        [e, newgraph.ricci_curvature[e]
+                            [-1], newgraph.weights[e][-1]]
                     )
     return
 
@@ -255,11 +261,11 @@ def update_orc_and_weights_iter_manager(
                     jobstosend = []
                     if jobcnt <= remainder:
                         jobstosend = edges[
-                            (jobcnt - 1) * chunksize : jobcnt * chunksize
+                            (jobcnt - 1) * chunksize: jobcnt * chunksize
                         ] + [edges[-jobcnt]]
                     else:
                         jobstosend = edges[
-                            (jobcnt - 1) * chunksize : jobcnt * chunksize
+                            (jobcnt - 1) * chunksize: jobcnt * chunksize
                         ]
                     SLICE = (
                         jobstosend,
@@ -292,7 +298,8 @@ def update_orc_and_weights_iter_manager(
                             len(jobs),
                         )
                     for e in jobs:  # sync up the graph
-                        graph.add_ricci_curvature(e, newgraph.ricci_curvature[e][-1])
+                        graph.add_ricci_curvature(
+                            e, newgraph.ricci_curvature[e][-1])
                         graph.add_weights(e, newgraph.weights[e][-1])
                         writer.writerow(
                             [
@@ -435,6 +442,8 @@ def one_direction_of_work_manager(
 
 # Worker functions
 def calculate_target_orc_worker():
+    '''Corresponds to calculate_target_orc_manager function
+    '''
     specs = COMM.recv(source=0, tag=33)
     if specs == -1:
         return
@@ -496,6 +505,10 @@ def update_orc_and_weights_iter_worker() -> bool:
 
 
 def one_direction_of_work_worker(tot_its=100):
+    '''This corresponds to the one_direction_of_work manager
+
+    :param int tot_its: number of max iterations before considering divergence, defaults to 100
+    '''
     calculate_target_orc_worker()
     update_orc_and_weights_iter_worker()
     cont = True
@@ -506,7 +519,12 @@ def one_direction_of_work_worker(tot_its=100):
     return
 
 
-def manager(npr, verbose=True):
+def manager(npr: int, verbose=False):
+    '''This is the main function for the manager node
+
+    :param int npr: number of worker nodes we're working with
+    :param bool verbose: verbose flag, defaults to False
+    '''
     clean_output(verbose)
     # source_filename = os.environ.get('SOURCE_FILENAME')
     # target_filename = os.environ.get('TARGET_FILENAME')
@@ -598,7 +616,6 @@ def manager(npr, verbose=True):
     clock_time("Time for final")
 
     # tell the jobs to sleep (at the very end)
-    # send the jobs
     for i in range(1, npr):
         SLICE = -33
         COMM.send(SLICE, dest=i, tag=55)
@@ -607,7 +624,12 @@ def manager(npr, verbose=True):
     return
 
 
-def worker(w, verbose=True):
+def worker(w: int, verbose=False):
+    '''This is the main function for the worker node
+
+    :param int w: The rank of the specific worker node we're using. Used primarily in pulling the information
+    :param bool verbose: verbose flag, defaults to False
+    '''
     one_direction_of_work_worker(tot_its=ITS)
     one_direction_of_work_worker(tot_its=ITS)
     while True:
