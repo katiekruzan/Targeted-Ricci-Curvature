@@ -20,8 +20,7 @@ class Hypergraph(ABC):
         self.nodes = set()  # arbitrary, not defined type as of now.
         self.hyperedges = {}  # dict from hyperedge id to lists of nodes in that edge
         self.weights = {}  # dict that had hyperedge ids to weights
-        # dict with hyperedge id to list of ricci curvatures (floats)
-        self.ricci_curvature = {}
+        self.ricci_curvature = {} # dict with hyperedge id to list of ricci curvatures (floats)
         self.node_index = {}
 
     def add_node(self, node: any) -> None:
@@ -479,10 +478,12 @@ class UndirectedHypergraph(Hypergraph):
         For now, we're just testing on undirected. So will go forward on that.
 
         :param Hypergraph other_graph: The other graph we're working with. Should be of the same type as self.
-        :param list[list] self_dist_mat: _description_
+        :param list[list] self_dist_mat: matrix of minimal distances from the floyd_warshall function
         :param bool verbose: verbose flag
         '''
-        # TODO: raise error if other_graph is not Undirected
+        # Ensure nodes is a list
+        if not isinstance(other_graph, UndirectedHypergraph):
+            raise ValueError("Trying to compare and Undirected graph with something else")
         for e in set(other_graph.hyperedges) - set(self.hyperedges):
             node1 = other_graph.hyperedges[e][0]
             node2 = other_graph.hyperedges[e][1]
@@ -507,10 +508,10 @@ class UndirectedHypergraph(Hypergraph):
         return self.is_weakly_connected()
 
     def node_degree(self, node) -> int:
-        ''' Calculate the degree of a node. Degree is the numer of hyperedges 
+        ''' Calculate the degree of a node. Degree is the number of hyperedges 
         containing this node.
 
-        :param _type_ node: the node we want to actually capture info for
+        :param node: the node we want to actually capture info for
         :raises ValueError: Raises if the node doesn't exist in the graph
         :return int: The number of hyperedges containing the node
         '''
@@ -542,7 +543,7 @@ class UndirectedHypergraph(Hypergraph):
         # Generate all combinations of pairs of nodes
         for node_A, node_B in combinations(nodes, 2):
             emd = self.earthmover_distance_distance_matrix(
-                (node_A, node_B, hyperedge_id), distance_matrix, approx_emd, gurobi_flag, verbose=False)
+                (node_A, node_B, hyperedge_id), distance_matrix, approx_emd, gurobi_flag, verbose=verbose)
 
             if emd is not None:
                 sum_emd += emd
@@ -645,12 +646,12 @@ class UndirectedHypergraph(Hypergraph):
         neighbours.discard(node)
         return neighbours
 
-    def node_probability(self, node: any) -> dict:
+    def node_probability(self, node) -> dict:
         '''Calculate the probability distributions of a specific node. This will
         calculate 1/deg(u) spread out around the neighbors. But it's also a lazy 
         distribution.
 
-        :param any node: should pull up a node
+        :param node: should pull up a node
         :raises ValueError: Will be raised if there is not a node of the name given in the graph
         :return dict: mu will be {node: dist} dictionary
         '''
@@ -728,14 +729,43 @@ class DirectedHypergraph(Hypergraph):
                     f'Added hyperedge {edgeid} with head set {node1} and tail set {node2}')
         return
 
-    def add_missing_edges_shortest_path(self, other_graph, self_dist_mat, verbose: bool) -> None:
+    def add_hyperedge(self, hyperedge_id:str, tail_set:set, head_set:set, weight = [1], verbose=False) -> None:
+        '''Function to add a hyperedge to the hypergraph, if the nodes are not 
+        there, will add the nodes
+        
+        :param str hyperedge_id: the name you would like to be used for the hyperedge
+        :param set tail_set: a list of the tail nodes (nodes leaving from)
+        :param set head_set: a list of the head nodes (nodes going to)
+        :param numeric weight: Is going to be the most recent weight
+        :param bool verbose: verbose flag, defaults to True
+        '''
+        # Check if hyperedge already exists
+        if hyperedge_id in self.hyperedges:
+            print(f"Hyperedge {hyperedge_id} already exists with nodes {self.hyperedges[hyperedge_id]}")
+            return
+        
+        # Add missing nodes to the node set
+        for node in tail_set.union(head_set):
+            if node not in self.nodes:
+                self.add_node(node)
+                
+        # Add the hyperedge
+        if verbose:
+            f'Adding hyperedge {hyperedge_id} with tail nodes {tail_set} and head nodes {head_set}'
+        self.hyperedges[hyperedge_id] = (tail_set, head_set)
+        self.weights[hyperedge_id]= weight
+        return
+    
+    def add_missing_edges_shortest_path(self, other_graph:Hypergraph, self_dist_mat:list[list], verbose: bool) -> None:
         '''So the idea, will be to add this edge, and then later delete it. Need to think about how to keep track of them
         For now, we're just testing on undirected. So will go forward on that.
 
         :param Hypergraph other_graph: The other graph we're working with. Should be of the same type as self.
+        :param list[list] self_dist_mat: matrix of minimal distances from the floyd_warshall function
         :param bool verbose: verbose flag
-        '''
-        # TODO: raise error if other_graph is not Directed
+        '''  
+        if not isinstance(other_graph, DirectedHypergraph):
+            raise ValueError("Trying to compare and Directed graph with something else")
         for e in set(other_graph.hyperedges) - set(self.hyperedges):
             (tail, head) = other_graph.hyperedges[e]
             # TODO: implement for hypegraphs
@@ -798,8 +828,8 @@ class DirectedHypergraph(Hypergraph):
 
         Will always return a numpy array (in-deg, out-deg)
 
-        :param _type_ node: the node we want to actually capture info for
-        :raises ValueError: _description_
+        :param  node: the node we want to actually capture info for
+        :raises ValueError: raises if the node doesn't exist in the graph
         :return np.array: array of degrees with (in-deg, out-deg)
         '''
         if node not in self.nodes:
@@ -815,7 +845,7 @@ class DirectedHypergraph(Hypergraph):
 
         return [d_in_x, d_out_x]
 
-    def calculate_probability_distributions(self, hyperedge_id: str):
+    def calculate_probability_distributions(self, hyperedge_id: str) -> dict:
         '''Function to calculate the probability distributions over all nodes based on the hyperedge
 
         :param str hyperedge_id: Name of the edge we're working with
