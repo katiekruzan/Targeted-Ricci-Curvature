@@ -8,35 +8,42 @@ from sklearn.metrics import rand_score, adjusted_rand_score
 COMM = MPI.COMM_WORLD
 
 
-def delete_hyperedges(hypergraph:Hypergraph, percentage=0.08):
+def delete_hyperedges(hypergraph: Hypergraph, percentage=0.08):
     '''We want to get the *highest* value weighted edges and delete them
 
-    :param _type_ hypergraph: _description_
-    :param float percentage: _description_, defaults to 0.08
-    '''    
+    :param Hypergraph hypergraph: The Hypergraph we're working with
+    :param float percentage: the percentage of edges we're dropping, defaults to 0.08
+    '''
     total_hyperedges = len(hypergraph.hyperedges)
     del_hyperedges = int(percentage * total_hyperedges)
-    recent_weights = {he: hypergraph.weights[he][-1] for he in hypergraph.hyperedges.keys()}
-    hyperedges_to_remove = sorted(recent_weights, key=recent_weights.get, reverse=True)[:del_hyperedges]
+    recent_weights = {he: hypergraph.weights[he][-1]
+                      for he in hypergraph.hyperedges.keys()}
+    hyperedges_to_remove = sorted(
+        recent_weights, key=recent_weights.get, reverse=True)[:del_hyperedges]
     for he in hyperedges_to_remove:
         hypergraph.remove_hyperedge(he)
-    
 
-def write_hypergraph_stats(hypergraph:Hypergraph):
+
+def write_hypergraph_stats(hypergraph: Hypergraph) -> dict:
+    '''Ger the information and the components from the hypergraph that is given
+
+    :param Hypergraph hypergraph: The stats of the hypergraph we're looking at
+    :return dict: dictionary of connected components
+    '''
     write_scorecard(f"Number of hyperedges: {len(hypergraph.hyperedges)}")
     write_scorecard(f"Number of nodes: {len(hypergraph.nodes)}")
     connected = hypergraph.is_weakly_connected()
-    write_scorecard("The hypergraph is weakly connected:" if connected else "The hypergraph is not weakly connected.")
+    write_scorecard(
+        "The hypergraph is weakly connected:" if connected else "The hypergraph is not weakly connected.")
     components = hypergraph.connected_components()
     write_scorecard(f"Connected Components: {components}")
     write_scorecard(f"No. of modules: {len(set(components.values()))}")
-    # # Listing all hyperedges
     return components
-            
+
 
 # Manager Functions
 def update_orc_and_weights_iter_manager(
-    npr:int, hypergraph: Hypergraph, dist_matrix:list[list], iteration:int, graphname:str, verbose=False
+    npr: int, hypergraph: Hypergraph, dist_matrix: list[list], iteration: int, graphname: str, verbose=False
 ):
     '''The main function of this whole sheboodle. Run the whole process for the given itteration.
     Note in this one, we will not be persisting this. Will trust that this is correct
@@ -47,16 +54,16 @@ def update_orc_and_weights_iter_manager(
     :param int iteration: the round we're on
     :param str graphname: This name is used in the filename
     :param bool verbose: verbose flag, defaults to False
-    '''    
+    '''
     file_name = f"outputfiles/dataset_untargeted_curvature_{graphname}_iteration_{iteration}.csv"
     updated_weights = {}
     # delete previous itteration
-    
 
     with open(file_name, "a", newline="") as file:
         writer = csv.writer(file)
         if file.tell() == 0:
-            writer.writerow(["Hyperedge ID", "ORC: (based on t-1 weights)", "Weight:t"])
+            writer.writerow(
+                ["Hyperedge ID", "ORC: (based on t-1 weights)", "Weight:t"])
 
         # split the edges. Just do it the simple way. Just have the last one take the rest
         edges = list(hypergraph.hyperedges.keys())
@@ -71,11 +78,13 @@ def update_orc_and_weights_iter_manager(
                 jobstosend = []
                 if jobcnt <= remainder:
                     jobstosend = edges[
-                        (jobcnt - 1) * chunksize : jobcnt * chunksize
+                        (jobcnt - 1) * chunksize: jobcnt * chunksize
                     ] + [edges[-jobcnt]]
                 else:
-                    jobstosend = edges[(jobcnt - 1) * chunksize : jobcnt * chunksize]
-                SLICE = (jobstosend, dist_matrix, hypergraph, iteration, verbose)
+                    jobstosend = edges[(jobcnt - 1) *
+                                       chunksize: jobcnt * chunksize]
+                SLICE = (jobstosend, dist_matrix,
+                         hypergraph, iteration, verbose)
                 COMM.send(SLICE, dest=i, tag=333)
                 if verbose:
                     print(
@@ -96,10 +105,11 @@ def update_orc_and_weights_iter_manager(
                         "number of jobs",
                         len(jobs),
                     )
-                    
+
                 updated_weights.update(updated_weightspt)
                 for e in jobs:  # sync up the graph
-                    hypergraph.add_ricci_curvature(e, newgraph.ricci_curvature[e][-1])
+                    hypergraph.add_ricci_curvature(
+                        e, newgraph.ricci_curvature[e][-1])
 
             for hyperedge_id, new_weight in updated_weights.items():
                 normalized_wt = new_weight
@@ -114,8 +124,15 @@ def update_orc_and_weights_iter_manager(
     return
 
 
-def one_direction_of_work_manager(npr:int, source_graph:Hypergraph, graphname:str):
-    
+def one_direction_of_work_manager(npr: int, source_graph: Hypergraph, graphname: str) -> Hypergraph:
+    '''Running the ricci flow on a graph until it converges
+
+    :param int npr: number of worker processors
+    :param Hypergraph source_graph: the source hypergraph we're doing the ricci flow on
+    :param str graphname: This name is used in the filename to persist info about the graph
+    :return Hypergraph: the final source graph from the ricci flow
+    '''
+
     for i in range(ITTS):
         print("Starting itteration ", i)
 
@@ -125,7 +142,7 @@ def one_direction_of_work_manager(npr:int, source_graph:Hypergraph, graphname:st
             npr, source_graph, dist_matrix, i, graphname, verbose
         )
         clock_time(f"Time for ORC {i}")
-        
+
         # convergence check
         allstable = True
         if i < 2:
@@ -170,13 +187,21 @@ def one_direction_of_work_manager(npr:int, source_graph:Hypergraph, graphname:st
                 COMM.send(-1, dest=k, tag=333)
             print("STABILIZED! Source to target distance is ", i)
             file_name = f"outputfiles/dataset_untargeted_curvature_{graphname}_iteration_{i}.csv"
-            os.rename(file_name, f'outputfiles/dataset_untargeted_final_curvature_{graphname}.csv')
+            os.rename(
+                file_name, f'outputfiles/dataset_untargeted_final_curvature_{graphname}.csv')
             break
-    
+
     return source_graph
 
 # Worker functions
-def update_orc_and_weights_iter_worker(w):
+
+
+def update_orc_and_weights_iter_worker(w: int) -> bool:
+    '''Corresponding function to update_orc_and_weights_iter_worker
+
+    :param int w: RANK of the worker that we're on
+    :return bool: True if the process should continue, False otherwise
+    '''
     updated_weights = {}
     specs = COMM.recv(source=0, tag=333)
     if specs == -1:
@@ -189,7 +214,7 @@ def update_orc_and_weights_iter_worker(w):
         nodes = graph.hyperedges[hyperedge_id]
         if len(nodes) < 2:  # hyper edges with less than 2 edges
             continue
-        
+
         if isinstance(graph, UndirectedHypergraph):
             u, v = (
                 nodes[0],
@@ -208,14 +233,14 @@ def update_orc_and_weights_iter_worker(w):
         graph.add_ricci_curvature(hyperedge_id, normalized_orc)
 
         weight = graph.weights[hyperedge_id][-1]
-    
+
         if iteration != 0:
             if weight != 0:
                 step = 1
                 wtplus1 = weight * (1 - step * normalized_orc)
             else:
                 wtplus1 = weight
-            #TODO: see if this makes sense to track updated weights separately
+            # TODO: see if this makes sense to track updated weights separately
             updated_weights[hyperedge_id] = wtplus1
         else:
             updated_weights[hyperedge_id] = weight
@@ -226,17 +251,27 @@ def update_orc_and_weights_iter_worker(w):
     return True
 
 
-def one_direction_of_work_worker(w, tot_its = 100):   
-    update_orc_and_weights_iter_worker(w) 
-    cont=True
+def one_direction_of_work_worker(w: int, tot_its=100):
+    '''This corresponds to the one_direction_of_work manager
+
+    :param int w: RANK of the worker that we're on
+    :param int tot_its: number of max iterations before considering divergence, defaults to 100
+    '''
+    update_orc_and_weights_iter_worker(w)
+    cont = True
     cnt = 1
-    while cont and (cnt<tot_its):
+    while cont and (cnt < tot_its):
         cont = update_orc_and_weights_iter_worker(w)
         cnt = cnt + 1
-    return 
+    return
 
 
-def setup_one_direction(source_file):
+def setup_one_direction(source_file: str) -> Hypergraph:
+    '''Setting up the source graph from the csv file
+
+    :param str source_file: The location of the csv
+    :return Hypergraph: The set up Hypergraph
+    '''
     if directed_flag:
         source_graph = DirectedHypergraph()
     else:
@@ -244,20 +279,21 @@ def setup_one_direction(source_file):
 
     print("building the graph")
 
-    df = pd.read_csv(source_file, dtype={'source': str, 'target':str})
+    df = pd.read_csv(source_file, dtype={'source': str, 'target': str})
     source_graph.build_from_dataframe(df, verbose)
-    
+
     write_scorecard(f"Type of graph: {type(source_graph)}")
     write_scorecard(f"Number of edges: {len(source_graph.hyperedges)}")
     write_scorecard(f"Number of nodes: {len(source_graph.nodes)}")
     return source_graph
 
-def manager(npr:int, verbose=False):
+
+def manager(npr: int, verbose=False):
     '''This is the main function for the manager node
 
     :param int npr: number of worker nodes we're working with
     :param bool verbose: verbose flag, defaults to False
-    '''    
+    '''
     clean_output(verbose)
 
     source_filename = os.environ.get('SOURCE_FILENAME')
@@ -269,7 +305,8 @@ def manager(npr:int, verbose=False):
     path2 = "inputfiles/" + target_filename
 
     # Scorecard Writing
-    write_scorecard("----- Untargeted Community Comparison Ricci Curvature -----")
+    write_scorecard(
+        "----- Untargeted Community Comparison Ricci Curvature -----")
     write_scorecard(f"Graph 1 filename: {path1}")
     write_scorecard(f"Graph 2 filename: {path2}")
 
@@ -291,8 +328,8 @@ def manager(npr:int, verbose=False):
         write_scorecard("EMD Solver: Python Optimal Transport")
 
     clock_time("Time to read the data in seconds")
-    
-    # now the idea is we run ricci flow until convergence for both, then compare 
+
+    # now the idea is we run ricci flow until convergence for both, then compare
     # communities, then delete edges, then calculate distances.
     graph1 = setup_one_direction(path1)
     graph2 = setup_one_direction(path2)
@@ -303,47 +340,58 @@ def manager(npr:int, verbose=False):
 
         graph2 = one_direction_of_work_manager(npr, graph2, 'Graph2')
         clock_time('Finished graph 2')
-        
+
         write_scorecard('\n--Stats for graph 1--')
         delete_hyperedges(graph1, percentage=0.08)
         communities1 = write_hypergraph_stats(graph1)
-        pd.DataFrame.from_dict(communities1, orient='index').to_csv(f'outputfiles/communityAssignmentGraph1Round{i}.csv')
-        os.rename('outputfiles/dataset_untargeted_final_curvature_Graph1.csv', f'outputfiles/dataset_untargeted_final_curvature_Graph1_Stage{i}.csv')
+        pd.DataFrame.from_dict(communities1, orient='index').to_csv(
+            f'outputfiles/communityAssignmentGraph1Round{i}.csv')
+        os.rename('outputfiles/dataset_untargeted_final_curvature_Graph1.csv',
+                  f'outputfiles/dataset_untargeted_final_curvature_Graph1_Stage{i}.csv')
         write_scorecard('--Stats for graph 2--')
         delete_hyperedges(graph2, percentage=0.08)
         communities2 = write_hypergraph_stats(graph2)
-        pd.DataFrame.from_dict(communities2, orient='index').to_csv(f'outputfiles/communityAssignmentGraph2Round{i}.csv')
-        os.rename('outputfiles/dataset_untargeted_final_curvature_Graph2.csv', f'outputfiles/dataset_untargeted_final_curvature_Graph2_Stage{i}.csv')
-        
+        pd.DataFrame.from_dict(communities2, orient='index').to_csv(
+            f'outputfiles/communityAssignmentGraph2Round{i}.csv')
+        os.rename('outputfiles/dataset_untargeted_final_curvature_Graph2.csv',
+                  f'outputfiles/dataset_untargeted_final_curvature_Graph2_Stage{i}.csv')
+
         # Now to do the adjusted random index. We will need to label each of them.
         labels1 = []
         labels2 = []
         for node in communities1.keys():
             labels1.append(communities1[node])
             labels2.append(communities2[node])
-        
+
         write_scorecard(f'\n*Stage {i} final community comparisons')
         write_scorecard('----------------------------------------')
         write_scorecard(f'Rand Score: {rand_score(labels1, labels2)}')
-        write_scorecard(f'Adjusted Rand Score: {adjusted_rand_score(labels1, labels2)}\n')
-    
+        write_scorecard(
+            f'Adjusted Rand Score: {adjusted_rand_score(labels1, labels2)}\n')
+
     # tell the jobs to sleep (at the very end)
     # send the jobs
     for i in range(1, npr):
         SLICE = -33
-        COMM.send(SLICE, dest = i, tag=55)
+        COMM.send(SLICE, dest=i, tag=55)
         if verbose:
             print(f'-> manager sends {SLICE} to worker', i)
     return
 
-def worker(w:int, verbose=False):
+
+def worker(w: int, verbose=False):
+    '''This is the main function for the worker node
+
+    :param int w: The rank of the specific worker node we're using. 
+    :param bool verbose: verbose flag, defaults to False
+    '''
     for i in range(DISTSEQ):
         one_direction_of_work_worker(w, tot_its=ITTS)
         one_direction_of_work_worker(w, tot_its=ITTS)
     # Turn off the workers
     while True:
-        specs = COMM.recv(source = 0, tag = 55)
-        if specs == -33: 
+        specs = COMM.recv(source=0, tag=55)
+        if specs == -33:
             if verbose:
                 print(f'Worker {w} goes to sleep')
             break
@@ -355,7 +403,7 @@ if __name__ == "__main__":
     We're going to run this for a set number of itterations. As I don't think this is the same 
     sense of convergence as we want. Looking at the paper.
     """
-    
+
     ITTS = 100
     DISTSEQ = 40
     start = time.time()
