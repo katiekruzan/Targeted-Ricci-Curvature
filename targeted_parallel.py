@@ -65,16 +65,18 @@ def early_analysis(src_graph: Hypergraph, verbose: bool):
     return
 
 
-def set_up_one_direction(src_graph: Hypergraph, targ_graph: Hypergraph, op_flag=False):
-    """Setting up the one direction stuff. But in a separate function to help organize.
+def set_up_one_direction(src_graph: Hypergraph, targ_graph: Hypergraph, op_flag=False): 
+    '''Setting up the one direction stuff. But in a separate function to help organize.
     Returns the target and source distance matrices (also persists them), and the
     set of missing edges from source and target
 
     :param Hypergraph src_graph: The source graph
     :param Hypergraph targ_graph: The target graph
-    :param bool op_flag: used to indicated if we should add the 'op_' prefix, defaults to False
-    :return : target_distance_matrix, distance_matrix, missing_from_src, missing_from_targ
-    """
+    :param bool op_flag: used to indicated if we should add the op prefix, defaults to False
+    :returns: target_distance_matrix, distance_matrix, missing_from_src, missing_from_targ
+    
+    '''
+    
     print("working on distance matrices")
     distance_matrix = src_graph.floyd_warshall()
     matfilename = "outputfiles/"
