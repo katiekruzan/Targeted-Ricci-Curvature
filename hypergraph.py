@@ -20,7 +20,8 @@ class Hypergraph(ABC):
         self.nodes = set()  # arbitrary, not defined type as of now.
         self.hyperedges = {}  # dict from hyperedge id to lists of nodes in that edge
         self.weights = {}  # dict that had hyperedge ids to weights
-        self.ricci_curvature = {} # dict with hyperedge id to list of ricci curvatures (floats)
+        # dict with hyperedge id to list of ricci curvatures (floats)
+        self.ricci_curvature = {}
         self.node_index = {}
 
     def add_node(self, node: any) -> None:
@@ -118,8 +119,7 @@ class Hypergraph(ABC):
         '''Taken from the implementation of DirectedHypergraph.py on 
         Prith's Ricci-Flow-on-Hypergraphs
 
-        :return dict: A dictionary of the nodes to some arbitrary label for 
-        what community it belongs to
+        :return dict: A dictionary of the nodes to some arbitrary label for what community it belongs to
         '''
         # empty graph has no components
         if not self.nodes:
@@ -483,7 +483,8 @@ class UndirectedHypergraph(Hypergraph):
         '''
         # Ensure nodes is a list
         if not isinstance(other_graph, UndirectedHypergraph):
-            raise ValueError("Trying to compare and Undirected graph with something else")
+            raise ValueError(
+                "Trying to compare and Undirected graph with something else")
         for e in set(other_graph.hyperedges) - set(self.hyperedges):
             node1 = other_graph.hyperedges[e][0]
             node2 = other_graph.hyperedges[e][1]
@@ -729,10 +730,10 @@ class DirectedHypergraph(Hypergraph):
                     f'Added hyperedge {edgeid} with head set {node1} and tail set {node2}')
         return
 
-    def add_hyperedge(self, hyperedge_id:str, tail_set:set, head_set:set, weight = [1], verbose=False) -> None:
+    def add_hyperedge(self, hyperedge_id: str, tail_set: set, head_set: set, weight=[1], verbose=False) -> None:
         '''Function to add a hyperedge to the hypergraph, if the nodes are not 
         there, will add the nodes
-        
+
         :param str hyperedge_id: the name you would like to be used for the hyperedge
         :param set tail_set: a list of the tail nodes (nodes leaving from)
         :param set head_set: a list of the head nodes (nodes going to)
@@ -741,31 +742,33 @@ class DirectedHypergraph(Hypergraph):
         '''
         # Check if hyperedge already exists
         if hyperedge_id in self.hyperedges:
-            print(f"Hyperedge {hyperedge_id} already exists with nodes {self.hyperedges[hyperedge_id]}")
+            print(
+                f"Hyperedge {hyperedge_id} already exists with nodes {self.hyperedges[hyperedge_id]}")
             return
-        
+
         # Add missing nodes to the node set
         for node in tail_set.union(head_set):
             if node not in self.nodes:
                 self.add_node(node)
-                
+
         # Add the hyperedge
         if verbose:
             f'Adding hyperedge {hyperedge_id} with tail nodes {tail_set} and head nodes {head_set}'
         self.hyperedges[hyperedge_id] = (tail_set, head_set)
-        self.weights[hyperedge_id]= weight
+        self.weights[hyperedge_id] = weight
         return
-    
-    def add_missing_edges_shortest_path(self, other_graph:Hypergraph, self_dist_mat:list[list], verbose: bool) -> None:
+
+    def add_missing_edges_shortest_path(self, other_graph: Hypergraph, self_dist_mat: list[list], verbose: bool) -> None:
         '''So the idea, will be to add this edge, and then later delete it. Need to think about how to keep track of them
         For now, we're just testing on undirected. So will go forward on that.
 
         :param Hypergraph other_graph: The other graph we're working with. Should be of the same type as self.
         :param list[list] self_dist_mat: matrix of minimal distances from the floyd_warshall function
         :param bool verbose: verbose flag
-        '''  
+        '''
         if not isinstance(other_graph, DirectedHypergraph):
-            raise ValueError("Trying to compare and Directed graph with something else")
+            raise ValueError(
+                "Trying to compare and Directed graph with something else")
         for e in set(other_graph.hyperedges) - set(self.hyperedges):
             (tail, head) = other_graph.hyperedges[e]
             # TODO: implement for hypegraphs
