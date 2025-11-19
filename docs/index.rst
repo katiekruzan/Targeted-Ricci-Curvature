@@ -1,20 +1,16 @@
-Welcome to Ricci-Flow-Distances's documentation!
-================================================
+.. TargetedRicciCurvature documentation master file, created by
+   sphinx-quickstart on Wed Nov 19 12:13:11 2025.
+   You can adapt this file completely to your liking, but it should at least
+   contain the root `toctree` directive.
 
-Welcome to the documentation for the `Ricci-Flow-Distances` files. We're also 
-using this as a fun way to retry my sphinx chops. And also I'll need to document 
-all the things, so always a good time to pay my taxes.
-
-.. automodule:: 
-    :members:
+Welcome to TargetedRicciCurvature's documentation!
+==================================================
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
    modules
-   hypergraph
-
 
 Indices and tables
 ==================
