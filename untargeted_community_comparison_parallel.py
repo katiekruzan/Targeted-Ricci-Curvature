@@ -405,7 +405,7 @@ if __name__ == "__main__":
     """
 
     ITTS = 100
-    DISTSEQ = 40
+    DISTSEQ = 20
     start = time.time()
     set_start(start)
 
