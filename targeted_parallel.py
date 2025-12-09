@@ -496,7 +496,7 @@ def update_orc_and_weights_iter_worker() -> bool:
             orc_targ = targ_graph.ricci_curvature[hyperedge_id][-1]
             if weight != 0:
                 # simple version
-                step = 1
+                step = .2
                 wtplus1 = weight * (1 - step * (normalized_orc - orc_targ))
                 normalized_weight = wtplus1
             else:
