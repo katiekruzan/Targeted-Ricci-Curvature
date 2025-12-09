@@ -413,6 +413,10 @@ class Hypergraph(ABC):
     @abstractmethod
     def add_missing_edges_shortest_path(self):
         pass
+    
+    @abstractmethod
+    def add_hyperedge(self):
+        pass
 
     @abstractmethod
     def node_degree(self):
