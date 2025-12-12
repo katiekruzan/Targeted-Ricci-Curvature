@@ -528,10 +528,10 @@ def manager(npr: int, verbose=False):
     :param bool verbose: verbose flag, defaults to False
     '''
     clean_output(verbose)
-    # source_filename = os.environ.get('SOURCE_FILENAME')
-    # target_filename = os.environ.get('TARGET_FILENAME')
-    source_filename = "petersen/petersengraph.csv"
-    target_filename = "petersen/petersengraphExtraEdge.csv"
+    source_filename = os.environ.get('SOURCE_FILENAME')
+    target_filename = os.environ.get('TARGET_FILENAME')
+    # source_filename = "petersen/petersengraph.csv"
+    # target_filename = "petersen/petersengraphExtraEdge.csv"
 
     data_target = pd.read_csv(
         f"inputfiles/{target_filename}", dtype={"source": str, "target": str}, sep=","
