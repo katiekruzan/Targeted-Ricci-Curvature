@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en"
+      data-content_root="./"
+      x-data="{ darkMode: localStorage.getItem('darkMode') || localStorage.setItem('darkMode', 'system'), activeSection: '' }"
+      x-init="$watch('darkMode', val => localStorage.setItem('darkMode', val))"
+      class="scroll-smooth"
+      :class="{'dark': darkMode === 'dark' || (darkMode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)}"
+>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="utf-8" />
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="white" />
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="black" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>hypergraph module | TargetedRicciCurvature 2.0.1 documentation</title>
+    <meta property="og:title" content="hypergraph module | TargetedRicciCurvature 2.0.1 documentation" />
+    <meta name="twitter:title" content="hypergraph module | TargetedRicciCurvature 2.0.1 documentation" />
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=4cbac711" />
+      <link rel="stylesheet" type="text/css" href="_static/theme.css?v=edd7d3d2" />
+        <link rel="search" title="Search" href="search.html" />
+        <link rel="index" title="Index" href="genindex.html" />
+          <link rel="next" title="ricciutil module" href="ricciutil.html" />
+          <link rel="prev" title="Targeted-Ricci-Curvature" href="modules.html" />
+
+    <script>
+    <!-- Prevent Flash of wrong theme -->
+      const userPreference = localStorage.getItem('darkMode');
+      let mode;
+      if (userPreference === 'dark' || window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        mode = 'dark';
+        document.documentElement.classList.add('dark');
+      } else {
+        mode = 'light';
+      }
+      if (!userPreference) {localStorage.setItem('darkMode', mode)}
+    </script>
+</head>
+<body x-data="{ showSidebar: false }" class="min-h-screen font-sans antialiased bg-background text-foreground" :class="{ 'overflow-hidden': showSidebar }">
+    <div x-cloak x-show="showSidebar" class="fixed inset-0 z-50 overflow-hidden bg-background/80 backdrop-blur-sm md:hidden" @click.self="showSidebar = false"></div><div id="page" class="relative flex flex-col min-h-screen"><a href="#content" class="absolute top-0 left-0 z-[100] block bg-background p-4 text-xl transition -translate-x-full opacity-0 focus:translate-x-0 focus:opacity-100">
+      Skip to content
+    </a><header
+  class="sticky top-0 z-40 w-full border-b shadow-sm border-border supports-backdrop-blur:bg-background/60 bg-background/95 backdrop-blur"><div class="container flex items-center h-14">
+    <div class="hidden mr-4 md:flex">
+      <a href="index.html" class="flex items-center mr-6"><span class="hidden font-bold sm:inline-block text-clip whitespace-nowrap">TargetedRicciCurvature 2.0.1 documentation</span>
+      </a></div><button
+      class="inline-flex items-center justify-center h-10 px-0 py-2 mr-2 text-base font-medium transition-colors rounded-md hover:text-accent-foreground hover:bg-transparent md:hidden"
+      type="button" @click="showSidebar = true">
+      <svg xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 96 960 960" aria-hidden="true"
+        fill="currentColor">
+        <path
+          d="M152.587 825.087q-19.152 0-32.326-13.174t-13.174-32.326q0-19.152 13.174-32.326t32.326-13.174h440q19.152 0 32.326 13.174t13.174 32.326q0 19.152-13.174 32.326t-32.326 13.174h-440Zm0-203.587q-19.152 0-32.326-13.174T107.087 576q0-19.152 13.174-32.326t32.326-13.174h320q19.152 0 32.326 13.174T518.087 576q0 19.152-13.174 32.326T472.587 621.5h-320Zm0-203.587q-19.152 0-32.326-13.174t-13.174-32.326q0-19.152 13.174-32.326t32.326-13.174h440q19.152 0 32.326 13.174t13.174 32.326q0 19.152-13.174 32.326t-32.326 13.174h-440ZM708.913 576l112.174 112.174q12.674 12.674 12.674 31.826t-12.674 31.826Q808.413 764.5 789.261 764.5t-31.826-12.674l-144-144Q600 594.391 600 576t13.435-31.826l144-144q12.674-12.674 31.826-12.674t31.826 12.674q12.674 12.674 12.674 31.826t-12.674 31.826L708.913 576Z" />
+      </svg>
+      <span class="sr-only">Toggle navigation menu</span>
+    </button>
+    <div class="flex items-center justify-between flex-1 space-x-2 sm:space-x-4 md:justify-end">
+      <div class="flex-1 w-full md:w-auto md:flex-none"><form id="searchbox"
+      action="search.html"
+      method="get"
+      class="relative flex items-center group"
+      @keydown.k.window.meta="$refs.search.focus()">
+  <input x-ref="search"
+          name="q"
+          id="search-input"
+          type="search"
+          aria-label="Search the docs"
+          placeholder="Search ..."
+          class="inline-flex items-center font-medium transition-colors bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background border border-input hover:bg-accent focus:bg-accent hover:text-accent-foreground focus:text-accent-foreground hover:placeholder-accent-foreground py-2 px-4 relative h-9 w-full justify-start rounded-[0.5rem] text-sm text-muted-foreground sm:pr-12 md:w-40 lg:w-64" />
+  <kbd class="pointer-events-none absolute right-1.5 top-2 hidden h-5 select-none text-muted-foreground items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex group-hover:bg-accent group-hover:text-accent-foreground">
+    <span class="text-xs">⌘</span>
+    K
+  </kbd>
+</form>
+      </div>
+      <nav class="flex items-center space-x-1">
+        <button @click="darkMode = darkMode === 'light' ? 'dark' : 'light'"
+          class="relative inline-flex items-center justify-center px-0 text-sm font-medium transition-colors rounded-md hover:bg-accent hover:text-accent-foreground h-9 w-9"
+          type="button"
+          aria-label="Color theme switcher">
+          <svg xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 96 960 960" fill="currentColor"
+            class="absolute transition-all scale-100 rotate-0 dark:-rotate-90 dark:scale-0">
+            <path
+              d="M480 685q45.456 0 77.228-31.772Q589 621.456 589 576q0-45.456-31.772-77.228Q525.456 467 480 467q-45.456 0-77.228 31.772Q371 530.544 371 576q0 45.456 31.772 77.228Q434.544 685 480 685Zm0 91q-83 0-141.5-58.5T280 576q0-83 58.5-141.5T480 376q83 0 141.5 58.5T680 576q0 83-58.5 141.5T480 776ZM80 621.5q-19.152 0-32.326-13.174T34.5 576q0-19.152 13.174-32.326T80 530.5h80q19.152 0 32.326 13.174T205.5 576q0 19.152-13.174 32.326T160 621.5H80Zm720 0q-19.152 0-32.326-13.174T754.5 576q0-19.152 13.174-32.326T800 530.5h80q19.152 0 32.326 13.174T925.5 576q0 19.152-13.174 32.326T880 621.5h-80Zm-320-320q-19.152 0-32.326-13.174T434.5 256v-80q0-19.152 13.174-32.326T480 130.5q19.152 0 32.326 13.174T525.5 176v80q0 19.152-13.174 32.326T480 301.5Zm0 720q-19.152 0-32.326-13.17Q434.5 995.152 434.5 976v-80q0-19.152 13.174-32.326T480 850.5q19.152 0 32.326 13.174T525.5 896v80q0 19.152-13.174 32.33-13.174 13.17-32.326 13.17ZM222.174 382.065l-43-42Q165.5 327.391 166 308.239t13.174-33.065q13.435-13.674 32.587-13.674t32.065 13.674l42.239 43q12.674 13.435 12.555 31.706-.12 18.272-12.555 31.946-12.674 13.674-31.445 13.413-18.772-.261-32.446-13.174Zm494 494.761-42.239-43q-12.674-13.435-12.674-32.087t12.674-31.565Q686.609 756.5 705.38 757q18.772.5 32.446 13.174l43 41.761Q794.5 824.609 794 843.761t-13.174 33.065Q767.391 890.5 748.239 890.5t-32.065-13.674Zm-42-494.761Q660.5 369.391 661 350.62q.5-18.772 13.174-32.446l41.761-43Q728.609 261.5 747.761 262t33.065 13.174q13.674 13.435 13.674 32.587t-13.674 32.065l-43 42.239q-13.435 12.674-31.706 12.555-18.272-.12-31.946-12.555Zm-495 494.761Q165.5 863.391 165.5 844.239t13.674-32.065l43-42.239q13.435-12.674 32.087-12.674t31.565 12.674Q299.5 782.609 299 801.38q-.5 18.772-13.174 32.446l-41.761 43Q231.391 890.5 212.239 890t-33.065-13.174ZM480 576Z" />
+          </svg>
+          <svg xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 96 960 960" fill="currentColor"
+            class="absolute transition-all scale-0 rotate-90 dark:rotate-0 dark:scale-100">
+            <path
+              d="M480 936q-151 0-255.5-104.5T120 576q0-138 90-239.5T440 218q25-3 39 18t-1 44q-17 26-25.5 55t-8.5 61q0 90 63 153t153 63q31 0 61.5-9t54.5-25q21-14 43-1.5t19 39.5q-14 138-117.5 229T480 936Zm0-80q88 0 158-48.5T740 681q-20 5-40 8t-40 3q-123 0-209.5-86.5T364 396q0-20 3-40t8-40q-78 32-126.5 102T200 576q0 116 82 198t198 82Zm-10-270Z" />
+          </svg>
+        </button>
+      </nav>
+    </div>
+  </div>
+</header>
+
+    <div class="flex-1"><div class="container flex-1 items-start md:grid md:grid-cols-[220px_minmax(0,1fr)] md:gap-6 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-10"><aside id="left-sidebar"
+  class="fixed inset-y-0 left-0 md:top-14 z-50 md:z-30 bg-background md:bg-transparent transition-all duration-100 -translate-x-full md:translate-x-0 ml-0 p-6 md:p-0 md:-ml-2 md:h-[calc(100vh-3.5rem)] w-5/6 md:w-full shrink-0 overflow-y-auto border-r border-border md:sticky"
+  :aria-hidden="!showSidebar" :class="{ 'translate-x-0': showSidebar }">
+
+    <a href="index.html" class="!justify-start text-sm md:!hidden bg-background"><span class="font-bold text-clip whitespace-nowrap">TargetedRicciCurvature 2.0.1 documentation</span>
+    </a>
+
+    <div class="relative overflow-hidden md:overflow-auto my-4 md:my-0 h-[calc(100vh-8rem)] md:h-auto">
+      <div class="overflow-y-auto h-full w-full relative pr-6"><nav class="table w-full min-w-full my-6 lg:my-8">
+  <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">Targeted-Ricci-Curvature</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">hypergraph module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ricciutil.html">ricciutil module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="targeted_parallel.html">targeted_parallel module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="untargeted_community_comparison_parallel.html">untargeted_community_comparison_parallel module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="untargeted_parallel.html">untargeted_parallel module</a></li>
+</ul>
+</li>
+</ul>
+
+</nav>
+      </div>
+    </div>
+    <button type="button" @click="showSidebar = false"
+      class="absolute md:hidden right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100">
+      <svg xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 96 960 960" fill="currentColor"
+        stroke="none" class="h-4 w-4">
+        <path
+          d="M480 632 284 828q-11 11-28 11t-28-11q-11-11-11-28t11-28l196-196-196-196q-11-11-11-28t11-28q11-11 28-11t28 11l196 196 196-196q11-11 28-11t28 11q11 11 11 28t-11 28L536 576l196 196q11 11 11 28t-11 28q-11 11-28 11t-28-11L480 632Z" />
+      </svg>
+    </button>
+  </aside>
+        <main class="relative py-6 lg:gap-10 lg:py-8 xl:grid xl:grid-cols-[1fr_300px]">
+<div class="w-full min-w-0 mx-auto">
+<nav aria-label="breadcrumbs"
+     class="flex items-center mb-4 space-x-1 text-sm text-muted-foreground">
+  <a class="overflow-hidden text-ellipsis whitespace-nowrap hover:text-foreground"
+     href="index.html">
+    <span class="hidden md:inline">TargetedRicciCurvature 2.0.1 documentation</span>
+    <svg xmlns="http://www.w3.org/2000/svg"
+         height="18"
+         width="18"
+         viewBox="0 96 960 960"
+         aria-label="Home"
+         fill="currentColor"
+         stroke="none"
+         class="md:hidden">
+      <path d="M240 856h120V616h240v240h120V496L480 316 240 496v360Zm-80 80V456l320-240 320 240v480H520V696h-80v240H160Zm320-350Z" />
+    </svg>
+  </a>
+  
+<div class="mr-1">/</div><a class="hover:text-foreground overflow-hidden text-ellipsis whitespace-nowrap"
+       href="modules.html">Targeted-Ricci-Curvature</a>
+    
+<div class="mr-1">/</div><span aria-current="page"
+        class="font-medium text-foreground overflow-hidden text-ellipsis whitespace-nowrap">hypergraph module</span>
+</nav>
+
+    <div id="content" role="main">
+      <section id="module-hypergraph">
+<span id="hypergraph-module"></span><h1>hypergraph module<a class="headerlink" href="#module-hypergraph" title="Link to this heading"><span>#</span></a></h1>
+<p>Definition of a hypergraph object. This will be used in the Ricci Flow Experiments</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="hypergraph.DirectedHypergraph">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">hypergraph.</span></span><span class="sig-name descname"><span class="pre">DirectedHypergraph</span></span><a class="reference internal" href="_modules/hypergraph.html#DirectedHypergraph"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.DirectedHypergraph" title="Link to this definition"><span>#</span></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#hypergraph.Hypergraph" title="hypergraph.Hypergraph"><code class="xref py py-class docutils literal notranslate"><span class="pre">Hypergraph</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="hypergraph.DirectedHypergraph.add_hyperedge">
+<span class="sig-name descname"><span class="pre">add_hyperedge</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hyperedge_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tail_set</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">set</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">head_set</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">set</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[1]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/hypergraph.html#DirectedHypergraph.add_hyperedge"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.DirectedHypergraph.add_hyperedge" title="Link to this definition"><span>#</span></a></dt>
+<dd><p>Function to add a hyperedge to the hypergraph, if the nodes are not
+there, will add the nodes</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>hyperedge_id</strong> (<em>str</em>) – the name you would like to be used for the hyperedge</p></li>
+<li><p><strong>tail_set</strong> (<em>set</em>) – a list of the tail nodes (nodes leaving from)</p></li>
+<li><p><strong>head_set</strong> (<em>set</em>) – a list of the head nodes (nodes going to)</p></li>
+<li><p><strong>weight</strong> (<em>numeric</em>) – Is going to be the most recent weight</p></li>
+<li><p><strong>verbose</strong> (<em>bool</em>) – verbose flag, defaults to True</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="hypergraph.DirectedHypergraph.add_missing_edges_shortest_path">
+<span class="sig-name descname"><span class="pre">add_missing_edges_shortest_path</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">other_graph</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#hypergraph.Hypergraph" title="hypergraph.Hypergraph"><span class="pre">Hypergraph</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">self_dist_mat</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">list</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/hypergraph.html#DirectedHypergraph.add_missing_edges_shortest_path"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.DirectedHypergraph.add_missing_edges_shortest_path" title="Link to this definition"><span>#</span></a></dt>
+<dd><p>So the idea, will be to add this edge, and then later delete it. Need to think about how to keep track of them
+For now, we’re just testing on undirected. So will go forward on that.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>other_graph</strong> (<a class="reference internal" href="#hypergraph.Hypergraph" title="hypergraph.Hypergraph"><em>Hypergraph</em></a>) – The other graph we’re working with. Should be of the same type as self.</p></li>
+<li><p><strong>self_dist_mat</strong> (<em>list</em><em>[</em><em>list</em><em>]</em>) – matrix of minimal distances from the floyd_warshall function</p></li>
+<li><p><strong>verbose</strong> (<em>bool</em>) – verbose flag</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="hypergraph.DirectedHypergraph.build_from_dataframe">
+<span class="sig-name descname"><span class="pre">build_from_dataframe</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/hypergraph.html#DirectedHypergraph.build_from_dataframe"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.DirectedHypergraph.build_from_dataframe" title="Link to this definition"><span>#</span></a></dt>
+<dd><p>Build hypergraph from a DataFrame</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>df</strong> (<em>pd.DataFrame</em>) – has the columns ‘source’, ‘target’, and ‘weight’</p></li>
+<li><p><strong>verbose</strong> (<em>bool</em>) – verbose flag, defaults to True</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="hypergraph.DirectedHypergraph.calculate_probability_distributions">
+<span class="sig-name descname"><span class="pre">calculate_probability_distributions</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hyperedge_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/hypergraph.html#DirectedHypergraph.calculate_probability_distributions"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.DirectedHypergraph.calculate_probability_distributions" title="Link to this definition"><span>#</span></a></dt>
+<dd><p>Function to calculate the probability distributions over all nodes based on the hyperedge</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>hyperedge_id</strong> (<em>str</em>) – Name of the edge we’re working with</p>
+</dd>
+<dt class="field-even">Return dict, dict<span class="colon">:</span></dt>
+<dd class="field-even"><p>muA in and muB out</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="hypergraph.DirectedHypergraph.get_underlying_edges">
+<span class="sig-name descname"><span class="pre">get_underlying_edges</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">set</span></span></span><a class="reference internal" href="_modules/hypergraph.html#DirectedHypergraph.get_underlying_edges"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.DirectedHypergraph.get_underlying_edges" title="Link to this definition"><span>#</span></a></dt>
+<dd><dl class="simple">
+<dt>Function to get the edges from the hyperedges.</dt><dd><p>We’re basically going to make it look like an undirected graph</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Return set<span class="colon">:</span></dt>
+<dd class="field-odd"><p>a set of edges with just the edgeid and then the nodes in a list</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="hypergraph.DirectedHypergraph.is_strongly_connected">
+<span class="sig-name descname"><span class="pre">is_strongly_connected</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/hypergraph.html#DirectedHypergraph.is_strongly_connected"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.DirectedHypergraph.is_strongly_connected" title="Link to this definition"><span>#</span></a></dt>
+<dd><p>Check if the underlying graph is strongly connected</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return bool<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True if strongly connected</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="hypergraph.DirectedHypergraph.node_degree">
+<span class="sig-name descname"><span class="pre">node_degree</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">array</span></span></span><a class="reference internal" href="_modules/hypergraph.html#DirectedHypergraph.node_degree"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.DirectedHypergraph.node_degree" title="Link to this definition"><span>#</span></a></dt>
+<dd><p>Calculate the degree of a node. Degree is the number of hyperedges
+containing this node.</p>
+<p>Will always return a numpy array (in-deg, out-deg)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>node</strong> – the node we want to actually capture info for</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – raises if the node doesn’t exist in the graph</p>
+</dd>
+<dt class="field-odd">Return np.array<span class="colon">:</span></dt>
+<dd class="field-odd"><p>array of degrees with (in-deg, out-deg)</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="hypergraph.Hypergraph">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">hypergraph.</span></span><span class="sig-name descname"><span class="pre">Hypergraph</span></span><a class="reference internal" href="_modules/hypergraph.html#Hypergraph"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.Hypergraph" title="Link to this definition"><span>#</span></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ABC</span></code></p>
+<p>This is the main class we use for they hypergraph object that stores
+Ricci curvatures as well</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="hypergraph.Hypergraph.add_hyperedge">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">add_hyperedge</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hypergraph.html#Hypergraph.add_hyperedge"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.Hypergraph.add_hyperedge" title="Link to this definition"><span>#</span></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="hypergraph.Hypergraph.add_missing_edges_shortest_path">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">add_missing_edges_shortest_path</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hypergraph.html#Hypergraph.add_missing_edges_shortest_path"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.Hypergraph.add_missing_edges_shortest_path" title="Link to this definition"><span>#</span></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="hypergraph.Hypergraph.add_node">
+<span class="sig-name descname"><span class="pre">add_node</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/hypergraph.html#Hypergraph.add_node"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.Hypergraph.add_node" title="Link to this definition"><span>#</span></a></dt>
+<dd><p>Function to add a node to the hypergraph. The type is not set</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>node</strong> (<em>any</em>) – The node to be added</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="hypergraph.Hypergraph.add_ricci_curvature">
+<span class="sig-name descname"><span class="pre">add_ricci_curvature</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hyperedge_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">orc</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/hypergraph.html#Hypergraph.add_ricci_curvature"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.Hypergraph.add_ricci_curvature" title="Link to this definition"><span>#</span></a></dt>
+<dd><dl class="simple">
+<dt>Function to add ollivier ricci curvature for all hyperedges for each iteration.</dt><dd><p>It will be appending to a list</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>hyperedge_id</strong> (<em>str</em>) – The id of the hyperedge of interest</p></li>
+<li><p><strong>orc</strong> (<em>float</em>) – the curvature to be appended</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="hypergraph.Hypergraph.add_weights">
+<span class="sig-name descname"><span class="pre">add_weights</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hyperedge_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Number</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/hypergraph.html#Hypergraph.add_weights"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.Hypergraph.add_weights" title="Link to this definition"><span>#</span></a></dt>
+<dd><dl class="simple">
+<dt>Function to add weights for all hyperedges for each iteration.</dt><dd><p>It will be appending to a list</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>hyperedge_id</strong> (<em>str</em>) – the id of the hyperedge of interest</p></li>
+<li><p><strong>weight</strong> (<em>Number</em>) – a number for the weight</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="hypergraph.Hypergraph.build_from_dataframe">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">build_from_dataframe</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hypergraph.html#Hypergraph.build_from_dataframe"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.Hypergraph.build_from_dataframe" title="Link to this definition"><span>#</span></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="hypergraph.Hypergraph.calculate_degrees">
+<span class="sig-name descname"><span class="pre">calculate_degrees</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hypergraph.html#Hypergraph.calculate_degrees"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.Hypergraph.calculate_degrees" title="Link to this definition"><span>#</span></a></dt>
+<dd><p>Return the max degree, min degree, and average degree values.
+For Directed, we get (in, out) pairs. Confirmed works on Directed</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>max degree, min degree, and average degree</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="hypergraph.Hypergraph.connected_components">
+<span class="sig-name descname"><span class="pre">connected_components</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/hypergraph.html#Hypergraph.connected_components"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.Hypergraph.connected_components" title="Link to this definition"><span>#</span></a></dt>
+<dd><p>Taken from the implementation of DirectedHypergraph.py on
+Prith’s Ricci-Flow-on-Hypergraphs</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return dict<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A dictionary of the nodes to some arbitrary label for what community it belongs to</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="hypergraph.Hypergraph.earthmover_distance_distance_matrix">
+<span class="sig-name descname"><span class="pre">earthmover_distance_distance_matrix</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">distance_matrix</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">list</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">approx_emd</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gurobi_flag</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">float</span></span></span><a class="reference internal" href="_modules/hypergraph.html#Hypergraph.earthmover_distance_distance_matrix"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.Hypergraph.earthmover_distance_distance_matrix" title="Link to this definition"><span>#</span></a></dt>
+<dd><p>Getting the actual EMD calculations. This combines the work between
+Undirected and Directed graphs into a single function</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<em>_type_</em>) – The data will differ based on if self is an Undirected or Directed Hypergraph</p></li>
+<li><p><strong>distance_matrix</strong> (<em>list</em><em>[</em><em>list</em><em>]</em>) – matrix of minimal distances from the floyd_warshall function</p></li>
+<li><p><strong>approx_emd</strong> (<em>bool</em>) – True if wanting to calculate approx EMD flag (only works for Undirected)</p></li>
+<li><p><strong>gurobi_emd</strong> (<em>bool</em>) – True if wanting to calculate EMD using Gurobi solver. Alternatively using pyot, flag</p></li>
+<li><p><strong>verbose</strong> (<em>bool</em>) – verbose flag</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – Will throw if the total masses aren’t equal. Comes up if something has gone wrong in the EMD calculation</p>
+</dd>
+<dt class="field-odd">Return float<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The actual EMD value</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="hypergraph.Hypergraph.floyd_warshall">
+<span class="sig-name descname"><span class="pre">floyd_warshall</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">list</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/hypergraph.html#Hypergraph.floyd_warshall"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.Hypergraph.floyd_warshall" title="Link to this definition"><span>#</span></a></dt>
+<dd><dl class="simple">
+<dt>Use the Floyd-Warshall algorithm to find the shortest distances between</dt><dd><p>each pair of vertices. Right now, if you cannot get from one node to
+another, the distance will be the maximum value + 1. This will be relevant in the
+case of directed, not strongly connected graphs.</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Return list[list]<span class="colon">:</span></dt>
+<dd class="field-odd"><p>a matrix with the shortest distances, that will be ordered by self.node_index</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="hypergraph.Hypergraph.get_underlying_edges">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_underlying_edges</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hypergraph.html#Hypergraph.get_underlying_edges"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.Hypergraph.get_underlying_edges" title="Link to this definition"><span>#</span></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="hypergraph.Hypergraph.is_2_uniform">
+<span class="sig-name descname"><span class="pre">is_2_uniform</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/hypergraph.html#Hypergraph.is_2_uniform"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.Hypergraph.is_2_uniform" title="Link to this definition"><span>#</span></a></dt>
+<dd><p>Check if size of each edge is 2</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return bool<span class="colon">:</span></dt>
+<dd class="field-odd"><p>true if graph is 2 uniform</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="hypergraph.Hypergraph.is_strongly_connected">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">is_strongly_connected</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hypergraph.html#Hypergraph.is_strongly_connected"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.Hypergraph.is_strongly_connected" title="Link to this definition"><span>#</span></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="hypergraph.Hypergraph.is_weakly_connected">
+<span class="sig-name descname"><span class="pre">is_weakly_connected</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/hypergraph.html#Hypergraph.is_weakly_connected"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.Hypergraph.is_weakly_connected" title="Link to this definition"><span>#</span></a></dt>
+<dd><dl class="simple">
+<dt>Check if the underlying graph is weakly connected. Will return True</dt><dd><p>for empty graphs.</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Return bool<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True if weakly connected</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="hypergraph.Hypergraph.node_degree">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">node_degree</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hypergraph.html#Hypergraph.node_degree"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.Hypergraph.node_degree" title="Link to this definition"><span>#</span></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="hypergraph.Hypergraph.remove_hyperedge">
+<span class="sig-name descname"><span class="pre">remove_hyperedge</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hyperedge_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/hypergraph.html#Hypergraph.remove_hyperedge"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.Hypergraph.remove_hyperedge" title="Link to this definition"><span>#</span></a></dt>
+<dd><p>Remove a hyperedge from the graph. Notably, will not remove the nodes</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>hyperedge_id</strong> (<em>str</em>) – The hyperedge to be deleted</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="hypergraph.Hypergraph.update_node_index">
+<span class="sig-name descname"><span class="pre">update_node_index</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/hypergraph.html#Hypergraph.update_node_index"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.Hypergraph.update_node_index" title="Link to this definition"><span>#</span></a></dt>
+<dd><p>The goal is to ensure there is a static node index for the graph.
+This function generates it. It will be an attribute.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="hypergraph.UndirectedHypergraph">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">hypergraph.</span></span><span class="sig-name descname"><span class="pre">UndirectedHypergraph</span></span><a class="reference internal" href="_modules/hypergraph.html#UndirectedHypergraph"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.UndirectedHypergraph" title="Link to this definition"><span>#</span></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#hypergraph.Hypergraph" title="hypergraph.Hypergraph"><code class="xref py py-class docutils literal notranslate"><span class="pre">Hypergraph</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="hypergraph.UndirectedHypergraph.add_hyperedge">
+<span class="sig-name descname"><span class="pre">add_hyperedge</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hyperedge_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nodes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight_list</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[1]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/hypergraph.html#UndirectedHypergraph.add_hyperedge"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.UndirectedHypergraph.add_hyperedge" title="Link to this definition"><span>#</span></a></dt>
+<dd><p>Add a hyperedge to the hypergraph. Automatically adds missing nodes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>hyperedge_id</strong> (<em>str</em>) – the name you would like to be used for the hyperedge</p></li>
+<li><p><strong>nodes</strong> (<em>list</em>) – a list of the adjacent nodes</p></li>
+<li><p><strong>weight_list</strong> (<em>list</em>) – Should start as a list with a single element (expect for weird cases), defaults to [1]</p></li>
+<li><p><strong>verbose</strong> (<em>bool</em>) – verbose flag, defaults to True</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If the nodes is not a list, will raise this error</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="hypergraph.UndirectedHypergraph.add_missing_edges_shortest_path">
+<span class="sig-name descname"><span class="pre">add_missing_edges_shortest_path</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">other_graph</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#hypergraph.Hypergraph" title="hypergraph.Hypergraph"><span class="pre">Hypergraph</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">self_dist_mat</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">list</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/hypergraph.html#UndirectedHypergraph.add_missing_edges_shortest_path"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.UndirectedHypergraph.add_missing_edges_shortest_path" title="Link to this definition"><span>#</span></a></dt>
+<dd><p>So the idea, will be to add this edge, and then later delete it.
+Need to think about how to keep track of them
+For now, we’re just testing on undirected. So will go forward on that.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>other_graph</strong> (<a class="reference internal" href="#hypergraph.Hypergraph" title="hypergraph.Hypergraph"><em>Hypergraph</em></a>) – The other graph we’re working with. Should be of the same type as self.</p></li>
+<li><p><strong>self_dist_mat</strong> (<em>list</em><em>[</em><em>list</em><em>]</em>) – matrix of minimal distances from the floyd_warshall function</p></li>
+<li><p><strong>verbose</strong> (<em>bool</em>) – verbose flag</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="hypergraph.UndirectedHypergraph.build_from_dataframe">
+<span class="sig-name descname"><span class="pre">build_from_dataframe</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/hypergraph.html#UndirectedHypergraph.build_from_dataframe"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.UndirectedHypergraph.build_from_dataframe" title="Link to this definition"><span>#</span></a></dt>
+<dd><p>Build hypergraph from a DataFrame</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>df</strong> (<em>pd.DataFrame</em>) – has the columns ‘source’, ‘target’, and ‘weight’</p></li>
+<li><p><strong>verbose</strong> (<em>bool</em>) – verbose flag, defaults to True</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="hypergraph.UndirectedHypergraph.earthmover_distance_hyperedge_combinations">
+<span class="sig-name descname"><span class="pre">earthmover_distance_hyperedge_combinations</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hyperedge_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">distance_matrix</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">list</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">approx_emd</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gurobi_flag</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">float</span></span></span><a class="reference internal" href="_modules/hypergraph.html#UndirectedHypergraph.earthmover_distance_hyperedge_combinations"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.UndirectedHypergraph.earthmover_distance_hyperedge_combinations" title="Link to this definition"><span>#</span></a></dt>
+<dd><p>This buddy gets the average EMD across the whole edge</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>hyperedge_id</strong> (<em>str</em>) – The identifier for the hyperedge</p></li>
+<li><p><strong>distance_matrix</strong> (<em>list</em><em>[</em><em>list</em><em>]</em>) – matrix of minimal distances from the floyd_warshall function</p></li>
+<li><p><strong>approx_emd</strong> (<em>bool</em>) – flag to be passed to the emd calculation</p></li>
+<li><p><strong>gurobi_emd</strong> (<em>bool</em>) – flag to be passed to the emd calculation</p></li>
+<li><p><strong>verbose</strong> (<em>bool</em>) – verbose flag</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return float<span class="colon">:</span></dt>
+<dd class="field-even"><p>The average EMD for all permutations of node pairs, or None if the hyperedge does not exist or has errors.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="hypergraph.UndirectedHypergraph.find_hyperedges_containing_all_nodes">
+<span class="sig-name descname"><span class="pre">find_hyperedges_containing_all_nodes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">nodes</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span></span></span><a class="reference internal" href="_modules/hypergraph.html#UndirectedHypergraph.find_hyperedges_containing_all_nodes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.UndirectedHypergraph.find_hyperedges_containing_all_nodes" title="Link to this definition"><span>#</span></a></dt>
+<dd><p>Find hyperedges that contain all of the specified nodes. This is used in approx emd calc</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return list<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list of hyperedges that contain all the specified nodes</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="hypergraph.UndirectedHypergraph.find_hyperedges_containing_nodes">
+<span class="sig-name descname"><span class="pre">find_hyperedges_containing_nodes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">nodes</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span></span></span><a class="reference internal" href="_modules/hypergraph.html#UndirectedHypergraph.find_hyperedges_containing_nodes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.UndirectedHypergraph.find_hyperedges_containing_nodes" title="Link to this definition"><span>#</span></a></dt>
+<dd><p>Find hyperedges that contain any of the specified nodes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return list<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list of hyperedges that contain any the specified nodes</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="hypergraph.UndirectedHypergraph.get_underlying_edges">
+<span class="sig-name descname"><span class="pre">get_underlying_edges</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/hypergraph.html#UndirectedHypergraph.get_underlying_edges"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.UndirectedHypergraph.get_underlying_edges" title="Link to this definition"><span>#</span></a></dt>
+<dd><p>Get the underlying edges (undirected)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return dict<span class="colon">:</span></dt>
+<dd class="field-odd"><p>dict from hyperedge id to lists of nodes in that edge</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="hypergraph.UndirectedHypergraph.is_strongly_connected">
+<span class="sig-name descname"><span class="pre">is_strongly_connected</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/hypergraph.html#UndirectedHypergraph.is_strongly_connected"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.UndirectedHypergraph.is_strongly_connected" title="Link to this definition"><span>#</span></a></dt>
+<dd><p>Checks if the graph is strongly connected. For Undirected, that’s
+the same as weakly connected</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return bool<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True is the graph is strongly connected</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="hypergraph.UndirectedHypergraph.neighbours">
+<span class="sig-name descname"><span class="pre">neighbours</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">set</span></span></span><a class="reference internal" href="_modules/hypergraph.html#UndirectedHypergraph.neighbours"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.UndirectedHypergraph.neighbours" title="Link to this definition"><span>#</span></a></dt>
+<dd><p>Find all nodes that share at least one hyperedge with the specified node.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>node</strong> – The node for which to find neighbors.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A set of neighboring nodes.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="hypergraph.UndirectedHypergraph.node_degree">
+<span class="sig-name descname"><span class="pre">node_degree</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="_modules/hypergraph.html#UndirectedHypergraph.node_degree"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.UndirectedHypergraph.node_degree" title="Link to this definition"><span>#</span></a></dt>
+<dd><p>Calculate the degree of a node. Degree is the number of hyperedges
+containing this node.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>node</strong> – the node we want to actually capture info for</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – Raises if the node doesn’t exist in the graph</p>
+</dd>
+<dt class="field-odd">Return int<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The number of hyperedges containing the node</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="hypergraph.UndirectedHypergraph.node_probability">
+<span class="sig-name descname"><span class="pre">node_probability</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/hypergraph.html#UndirectedHypergraph.node_probability"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#hypergraph.UndirectedHypergraph.node_probability" title="Link to this definition"><span>#</span></a></dt>
+<dd><p>Calculate the probability distributions of a specific node. This will
+calculate 1/deg(u) spread out around the neighbors. But it’s also a lazy
+distribution.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>node</strong> – should pull up a node</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – Will be raised if there is not a node of the name given in the graph</p>
+</dd>
+<dt class="field-odd">Return dict<span class="colon">:</span></dt>
+<dd class="field-odd"><p>mu will be {node: dist} dictionary</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+    </div></div><aside id="right-sidebar" class="hidden text-sm xl:block">
+  <div class="sticky top-16 -mt-10 max-h-[calc(100vh-5rem)] overflow-y-auto pt-6 space-y-2"><p class="font-medium">On this page</p>
+    <ul>
+<li><a class="reference internal" href="#hypergraph.DirectedHypergraph"><code class="docutils literal notranslate"><span class="pre">DirectedHypergraph</span></code></a><ul>
+<li><a class="reference internal" href="#hypergraph.DirectedHypergraph.add_hyperedge"><code class="docutils literal notranslate"><span class="pre">DirectedHypergraph.add_hyperedge()</span></code></a></li>
+<li><a class="reference internal" href="#hypergraph.DirectedHypergraph.add_missing_edges_shortest_path"><code class="docutils literal notranslate"><span class="pre">DirectedHypergraph.add_missing_edges_shortest_path()</span></code></a></li>
+<li><a class="reference internal" href="#hypergraph.DirectedHypergraph.build_from_dataframe"><code class="docutils literal notranslate"><span class="pre">DirectedHypergraph.build_from_dataframe()</span></code></a></li>
+<li><a class="reference internal" href="#hypergraph.DirectedHypergraph.calculate_probability_distributions"><code class="docutils literal notranslate"><span class="pre">DirectedHypergraph.calculate_probability_distributions()</span></code></a></li>
+<li><a class="reference internal" href="#hypergraph.DirectedHypergraph.get_underlying_edges"><code class="docutils literal notranslate"><span class="pre">DirectedHypergraph.get_underlying_edges()</span></code></a></li>
+<li><a class="reference internal" href="#hypergraph.DirectedHypergraph.is_strongly_connected"><code class="docutils literal notranslate"><span class="pre">DirectedHypergraph.is_strongly_connected()</span></code></a></li>
+<li><a class="reference internal" href="#hypergraph.DirectedHypergraph.node_degree"><code class="docutils literal notranslate"><span class="pre">DirectedHypergraph.node_degree()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#hypergraph.Hypergraph"><code class="docutils literal notranslate"><span class="pre">Hypergraph</span></code></a><ul>
+<li><a class="reference internal" href="#hypergraph.Hypergraph.add_hyperedge"><code class="docutils literal notranslate"><span class="pre">Hypergraph.add_hyperedge()</span></code></a></li>
+<li><a class="reference internal" href="#hypergraph.Hypergraph.add_missing_edges_shortest_path"><code class="docutils literal notranslate"><span class="pre">Hypergraph.add_missing_edges_shortest_path()</span></code></a></li>
+<li><a class="reference internal" href="#hypergraph.Hypergraph.add_node"><code class="docutils literal notranslate"><span class="pre">Hypergraph.add_node()</span></code></a></li>
+<li><a class="reference internal" href="#hypergraph.Hypergraph.add_ricci_curvature"><code class="docutils literal notranslate"><span class="pre">Hypergraph.add_ricci_curvature()</span></code></a></li>
+<li><a class="reference internal" href="#hypergraph.Hypergraph.add_weights"><code class="docutils literal notranslate"><span class="pre">Hypergraph.add_weights()</span></code></a></li>
+<li><a class="reference internal" href="#hypergraph.Hypergraph.build_from_dataframe"><code class="docutils literal notranslate"><span class="pre">Hypergraph.build_from_dataframe()</span></code></a></li>
+<li><a class="reference internal" href="#hypergraph.Hypergraph.calculate_degrees"><code class="docutils literal notranslate"><span class="pre">Hypergraph.calculate_degrees()</span></code></a></li>
+<li><a class="reference internal" href="#hypergraph.Hypergraph.connected_components"><code class="docutils literal notranslate"><span class="pre">Hypergraph.connected_components()</span></code></a></li>
+<li><a class="reference internal" href="#hypergraph.Hypergraph.earthmover_distance_distance_matrix"><code class="docutils literal notranslate"><span class="pre">Hypergraph.earthmover_distance_distance_matrix()</span></code></a></li>
+<li><a class="reference internal" href="#hypergraph.Hypergraph.floyd_warshall"><code class="docutils literal notranslate"><span class="pre">Hypergraph.floyd_warshall()</span></code></a></li>
+<li><a class="reference internal" href="#hypergraph.Hypergraph.get_underlying_edges"><code class="docutils literal notranslate"><span class="pre">Hypergraph.get_underlying_edges()</span></code></a></li>
+<li><a class="reference internal" href="#hypergraph.Hypergraph.is_2_uniform"><code class="docutils literal notranslate"><span class="pre">Hypergraph.is_2_uniform()</span></code></a></li>
+<li><a class="reference internal" href="#hypergraph.Hypergraph.is_strongly_connected"><code class="docutils literal notranslate"><span class="pre">Hypergraph.is_strongly_connected()</span></code></a></li>
+<li><a class="reference internal" href="#hypergraph.Hypergraph.is_weakly_connected"><code class="docutils literal notranslate"><span class="pre">Hypergraph.is_weakly_connected()</span></code></a></li>
+<li><a class="reference internal" href="#hypergraph.Hypergraph.node_degree"><code class="docutils literal notranslate"><span class="pre">Hypergraph.node_degree()</span></code></a></li>
+<li><a class="reference internal" href="#hypergraph.Hypergraph.remove_hyperedge"><code class="docutils literal notranslate"><span class="pre">Hypergraph.remove_hyperedge()</span></code></a></li>
+<li><a class="reference internal" href="#hypergraph.Hypergraph.update_node_index"><code class="docutils literal notranslate"><span class="pre">Hypergraph.update_node_index()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#hypergraph.UndirectedHypergraph"><code class="docutils literal notranslate"><span class="pre">UndirectedHypergraph</span></code></a><ul>
+<li><a class="reference internal" href="#hypergraph.UndirectedHypergraph.add_hyperedge"><code class="docutils literal notranslate"><span class="pre">UndirectedHypergraph.add_hyperedge()</span></code></a></li>
+<li><a class="reference internal" href="#hypergraph.UndirectedHypergraph.add_missing_edges_shortest_path"><code class="docutils literal notranslate"><span class="pre">UndirectedHypergraph.add_missing_edges_shortest_path()</span></code></a></li>
+<li><a class="reference internal" href="#hypergraph.UndirectedHypergraph.build_from_dataframe"><code class="docutils literal notranslate"><span class="pre">UndirectedHypergraph.build_from_dataframe()</span></code></a></li>
+<li><a class="reference internal" href="#hypergraph.UndirectedHypergraph.earthmover_distance_hyperedge_combinations"><code class="docutils literal notranslate"><span class="pre">UndirectedHypergraph.earthmover_distance_hyperedge_combinations()</span></code></a></li>
+<li><a class="reference internal" href="#hypergraph.UndirectedHypergraph.find_hyperedges_containing_all_nodes"><code class="docutils literal notranslate"><span class="pre">UndirectedHypergraph.find_hyperedges_containing_all_nodes()</span></code></a></li>
+<li><a class="reference internal" href="#hypergraph.UndirectedHypergraph.find_hyperedges_containing_nodes"><code class="docutils literal notranslate"><span class="pre">UndirectedHypergraph.find_hyperedges_containing_nodes()</span></code></a></li>
+<li><a class="reference internal" href="#hypergraph.UndirectedHypergraph.get_underlying_edges"><code class="docutils literal notranslate"><span class="pre">UndirectedHypergraph.get_underlying_edges()</span></code></a></li>
+<li><a class="reference internal" href="#hypergraph.UndirectedHypergraph.is_strongly_connected"><code class="docutils literal notranslate"><span class="pre">UndirectedHypergraph.is_strongly_connected()</span></code></a></li>
+<li><a class="reference internal" href="#hypergraph.UndirectedHypergraph.neighbours"><code class="docutils literal notranslate"><span class="pre">UndirectedHypergraph.neighbours()</span></code></a></li>
+<li><a class="reference internal" href="#hypergraph.UndirectedHypergraph.node_degree"><code class="docutils literal notranslate"><span class="pre">UndirectedHypergraph.node_degree()</span></code></a></li>
+<li><a class="reference internal" href="#hypergraph.UndirectedHypergraph.node_probability"><code class="docutils literal notranslate"><span class="pre">UndirectedHypergraph.node_probability()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</div>
+</aside>
+        </main>
+      </div>
+    </div><footer class="py-6 border-t border-border md:py-0">
+    <div class="container flex flex-col items-center justify-between gap-4 md:h-24 md:flex-row">
+      <div class="flex flex-col items-center gap-4 px-8 md:flex-row md:gap-2 md:px-0">
+        <p class="text-sm leading-loose text-center text-muted-foreground md:text-left">© 2025, Katie Kruzan&nbsp;Built with <a class="font-medium underline underline-offset-4"
+    href="https://www.sphinx-doc.org"
+    rel="noreferrer">Sphinx 8.1.3</a></p>
+</div>
+</div>
+</footer>
+  </div>
+  
+    <script src="_static/documentation_options.js?v=f5cff4aa"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script defer="defer" src="_static/theme.js?v=1808ab49"></script>
+  
+</body>
+</html>
