@@ -122,7 +122,75 @@ def calculate_target_orc(
     return
 
 
-def test_one_direction(src_graph:Hypergraph, targ_graph:Hypergraph, op_flag=False):
+def update_orc_and_weights_iter(
+    distance_matrix: list[list],
+    graph: Hypergraph,
+    targ_graph: Hypergraph,
+    iteration: int,
+    verbose: bool,
+    file_format="csv",
+    op_flag=False,
+) -> None:
+    """The main function of this whole sheboodle. Run the whole process for the given itteration
+
+    :param list[list] distance_matrix: matrix of minimal distances from the floyd_warshall function
+    :param Hypergraph graph: the source graph we're looking at (or at least its current itteration)
+    :param Hypergraph targ_graph: The target graph
+    :param int iteration: the round we're on
+    :param bool verbose: verbose flag
+    :param str file_format: defaults to 'csv'
+    :param bool op_flag: option to mark the file as 'op' (used in second half of
+                        script), defaults to False
+    """
+    if op_flag:
+        file_name = f"outputfiles/op_dataset_targeted_curvature_iteration_{iteration}.{file_format}"
+    else:
+        file_name = f"outputfiles/dataset_targeted_curvature_iteration_{iteration}.{file_format}"
+
+    with open(file_name, "a", newline="") as file:
+        if file_format == "csv":
+            writer = csv.writer(file)
+            # Check if the file is empty to write headers
+            if file.tell() == 0:
+                writer.writerow(
+                    ["Hyperedge ID", "ORC: (based on t-1 weights)", "Weight:t"]
+                )
+
+            # split the edges. Will have the remaining edges be split on the first r processors
+            edges = list(graph.hyperedges.keys())
+            jobs = edges
+
+            for hyperedge_id in jobs:
+                if isinstance(graph, UndirectedHypergraph):
+                    orc = graph.earthmover_distance_hyperedge_combinations(
+                        hyperedge_id, distance_matrix, approx_emd, gurobi_flag, verbose
+                    )
+                elif isinstance(graph, DirectedHypergraph):
+                    orc = 1 - graph.earthmover_distance_distance_matrix(
+                        hyperedge_id, distance_matrix, approx_emd, gurobi_flag, verbose=False
+                    )
+                normalized_orc = ricci_normalizing(orc)
+                graph.add_ricci_curvature(hyperedge_id, normalized_orc)
+                weight = graph.weights[hyperedge_id][-1]
+                if iteration != 0: #update the weights
+                    orc_targ = targ_graph.ricci_curvature[hyperedge_id][-1]
+                    if weight != 0:
+                        # simple version
+                        step = 1
+                        wtplus1 = weight * (1 - step * (normalized_orc - orc_targ))
+                        if wtplus1 < CUTOFF:
+                            wtplus1 = 0
+                        normalized_weight = wtplus1
+                    else:
+                        normalized_weight = 0
+                    graph.add_weights(hyperedge_id, normalized_weight)
+                writer.writerow([hyperedge_id, graph.ricci_curvature[hyperedge_id]
+                                [-1], graph.weights[hyperedge_id][-1]]
+                        )       
+    return
+
+
+def test_one_direction(src_graph:Hypergraph, targ_graph:Hypergraph, tot_its=100, op_flag=False):
 
     targ_distance_matrix, distance_matrix, missing_from_src, missing_from_targ = (
             set_up_one_direction(src_graph, targ_graph, op_flag)
@@ -133,6 +201,80 @@ def test_one_direction(src_graph:Hypergraph, targ_graph:Hypergraph, op_flag=Fals
     print("starting ricci curvature")
 
     calculate_target_orc(targ_distance_matrix, targ_graph, verbose, op_flag)
+    
+    update_orc_and_weights_iter(
+        distance_matrix,
+        src_graph,
+        targ_graph,
+        iteration=0,
+        verbose=verbose,
+        op_flag=op_flag
+    )
+    
+    if verbose:
+        clock_time("Time to calc source ORC")
+
+    for i in range(1, tot_its + 1):
+        print("Working on itteration", i)
+        distance_matrix_i = src_graph.floyd_warshall()
+        if verbose:
+            clock_time(f"finished distance matrix {i}")
+        if i > 1:
+            if len(missing_from_src) > 0 or len(missing_from_targ) > 0:
+                # We're gonna to the reset here
+                src_graph.add_missing_edges_shortest_path(
+                    targ_graph, distance_matrix, verbose
+                )
+                targ_graph.add_missing_edges_shortest_path(
+                    src_graph, targ_distance_matrix, verbose
+                )
+        print(len(targ_graph.hyperedges))
+        print(len(src_graph.hyperedges))
+        update_orc_and_weights_iter(
+            distance_matrix_i,
+            src_graph,
+            targ_graph,
+            iteration=i,
+            verbose=verbose,
+            op_flag=op_flag,
+        )
+        clock_time(f"Time for ORC {i}")
+
+        def missing_reset():
+            # We will do a "reset" here
+            if len(missing_from_src) > 0 or len(missing_from_targ) > 0:
+                # We're gonna to the reset here
+                # first delete all the edges
+                for e in missing_from_src:
+                    src_graph.remove_hyperedge(e)
+                for e in missing_from_targ:
+                    targ_graph.remove_hyperedge(e)
+
+        # the test for stability will be when the edgesets with nonzero edge weights will be equal
+        if i == 1:
+            # TODO: fix this weirdness
+            missing_reset()
+            # take care of the getting started case
+            continue
+        
+        missing_reset()
+        print(len(src_graph.weights))
+        print(type(src_graph.weights))
+
+        print(len(targ_graph.weights))
+        # quit()
+        nonzeroedges_src = [key for key, value_list in src_graph.weights.items() if value_list[-1]!=0]
+        nonzeroedges_targ = [key for key, value_list in targ_graph.weights.items() if value_list[-1]!=0]
+        if set(nonzeroedges_src) == set(nonzeroedges_targ):
+            print("STABILIZED! Source to target distance is ", i)
+            write_scorecard("\n\n----- Results -----")
+            write_scorecard(f"Source to target distance is {i}")
+            break
+        else:
+            print("sets not equal. ")
+            print("In Src and not Targ: ")
+            print(set(nonzeroedges_src)- set(nonzeroedges_targ))
+        break
     return
 
 
@@ -146,7 +288,7 @@ def runtest(verbose = False):
     # source_filename = os.environ.get('SOURCE_FILENAME')
     # target_filename = os.environ.get('TARGET_FILENAME')
     source_filename = "petersen/petersengraph.csv"
-    target_filename = "petersen/petersengraphExtraEdge.csv"
+    target_filename = "petersen/petersengraphdeledges.csv"
 
     data_target = pd.read_csv(
         f"inputfiles/{target_filename}", dtype={"source": str, "target": str}, sep=","
@@ -219,6 +361,7 @@ def runtest(verbose = False):
 
 
 if __name__ == "__main__":
+    CUTOFF = 0.1
     verbose = False
     absolute_change = True  # False is relative change
     maximum_error = True  # False is average error
@@ -239,5 +382,10 @@ if __name__ == "__main__":
     if approx_emd and directed_flag:
         print("Approx EMD not implemented for Directed graphs.")
         quit()
+
+    
+    start = time.time()
+    # moves this to the util
+    set_start(start)
 
     runtest(verbose)
