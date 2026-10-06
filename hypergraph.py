@@ -1,6 +1,7 @@
 '''Definition of a hypergraph object. This will be used in the Ricci Flow Experiments
 '''
 from numbers import Number
+from ricciutil import *
 import numpy as np
 from typing import *
 import pandas as pd
@@ -75,6 +76,54 @@ class Hypergraph(ABC):
                                node in enumerate(list(self.nodes))}
         return
 
+    def run_early_analysis(self, verbose:bool)-> None:
+        '''Get the information on the graph we're working on
+        
+        :param bool verbose: verbose flag
+        '''
+        connected = self.is_weakly_connected()
+        strconnect = self.is_strongly_connected()
+        max_degree, min_degree, avg_degree = self.calculate_degrees()
+    
+        if verbose:
+            print("type of graph", type(self))
+            # Printing the number of (hyper)edges in our network.
+            print("Number of edges:", len(self.hyperedges))
+            # Printing the number of nodes in the network.
+            print("Number of nodes", len(self.nodes))
+            print("The actual nodes:", self.nodes)
+            print("The actual edges with weights:", self.weights)
+    
+            print(
+                "The hypergraph is weakly connected."
+                if connected
+                else "The hypergraph is not weakly connected."
+            )
+    
+            print(f"Max Degree: {max_degree}")
+            print(f"Min Degree: {min_degree}")
+            print(f"Average Degree: {avg_degree}")
+    
+        write_scorecard("----- Graph Statistics -----")
+        write_scorecard(f"Type of Graph: {type(self)}")
+        write_scorecard(f"Number of edges: {len(self.hyperedges)}")
+        write_scorecard(f"Number of nodes: {len(self.nodes)}")
+        if connected:
+            write_scorecard("The hypergraph is weakly connected.")
+        else:
+            write_scorecard("The hypergraph is not weakly connected.")
+        if strconnect:
+            write_scorecard("The hypergraph is strongly connected.")
+        else:
+            write_scorecard("The hypergraph is not strongly connected.")
+        write_scorecard(f"Max Degree: {max_degree}")
+        # Quick note: directed can have these be 0
+        write_scorecard(f"Min Degree: {min_degree}")
+        # for directed graphs, this should be equal.
+        write_scorecard(f"Average Degree: {avg_degree}")
+        write_scorecard("----------------------------")
+        return
+    
     def is_2_uniform(self) -> bool:
         '''Check if size of each edge is 2
 
