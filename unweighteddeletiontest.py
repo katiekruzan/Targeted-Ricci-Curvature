@@ -228,8 +228,8 @@ def test_one_direction(src_graph:Hypergraph, targ_graph:Hypergraph, tot_its=100,
                 targ_graph.add_missing_edges_shortest_path(
                     src_graph, targ_distance_matrix, verbose
                 )
-        print(len(targ_graph.hyperedges))
-        print(len(src_graph.hyperedges))
+        # print(len(targ_graph.hyperedges))
+        # print(len(src_graph.hyperedges))
         update_orc_and_weights_iter(
             distance_matrix_i,
             src_graph,
@@ -258,10 +258,10 @@ def test_one_direction(src_graph:Hypergraph, targ_graph:Hypergraph, tot_its=100,
             continue
         
         missing_reset()
-        print(len(src_graph.weights))
-        print(type(src_graph.weights))
+        # print(len(src_graph.weights))
+        # print(type(src_graph.weights))
 
-        print(len(targ_graph.weights))
+        # print(len(targ_graph.weights))
         # quit()
         nonzeroedges_src = [key for key, value_list in src_graph.weights.items() if value_list[-1]!=0]
         nonzeroedges_targ = [key for key, value_list in targ_graph.weights.items() if value_list[-1]!=0]
@@ -274,7 +274,7 @@ def test_one_direction(src_graph:Hypergraph, targ_graph:Hypergraph, tot_its=100,
             print("sets not equal. ")
             print("In Src and not Targ: ")
             print(set(nonzeroedges_src)- set(nonzeroedges_targ))
-        break
+        # break
     return
 
 
