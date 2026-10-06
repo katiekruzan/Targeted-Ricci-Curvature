@@ -63,6 +63,8 @@ class Hypergraph(ABC):
         :param str hyperedge_id: The hyperedge to be deleted
         '''
         del self.hyperedges[hyperedge_id]
+        del self.weights[hyperedge_id]
+        del self.ricci_curvature[hyperedge_id]
         return
 
     def update_node_index(self) -> None:
@@ -544,6 +546,11 @@ class UndirectedHypergraph(Hypergraph):
             dist = self_dist_mat[self.node_index[node1]
                                  ][self.node_index[node2]]
             self.add_hyperedge(e, other_graph.hyperedges[e], [dist], verbose)
+            orc = self.earthmover_distance_hyperedge_combinations(
+                                    e, self_dist_mat, False, False, verbose
+                                ) # note will always do this the hardway
+            normalized_orc = ricci_normalizing(orc)
+            self.add_ricci_curvature(e, normalized_orc)
         return
 
     def get_underlying_edges(self) -> dict:
